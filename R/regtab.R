@@ -58,21 +58,14 @@ regtab_single <- function(
     filter(rowname %in% sumstat_vars) %>%
     rename(term = rowname, estimate = V1) %>%
     rename_all(~ ifelse(!(.x %in% c('term', 'type')), paste0(.x, prefix), .x))
+  table <- bind_rows(tidy_reg, sumstats)
 
   if (length(reg$xlevels) != 0) {
-    tidy_reg <- full_join(tidy_reg, levels, by = 'term')
+    table %<>%
+      full_join(levels, by = 'term')
+
   }
-  table <- tidy_reg %>%
-    bind_rows(sumstats) %>%
-    mutate(label = ifelse(is.na(label), term, label))
-
-  rle_label <- rle(table$label)
-  label_ix <- rep(seq_along(rle_label$values), rle_label$lengths)
-
-  table %<>%
-    mutate(label_ix = label_ix) %>%
-    arrange(label_ix, level_order) %>%
-    mutate(type = ifelse(is.na(type) & level_order == 1, 'omit', type))
+  table
 }
 
 regtab <- function(
@@ -86,10 +79,28 @@ regtab <- function(
     seq_along(reg_list)
   )
   if (length(init_list) > 1) {
-    Reduce(function(x, y) full_join(x, y, by = c('term', 'type')), init_list)
+    table <-
+      Reduce(function(x, y) full_join(x, y, by = c('term', 'type')), init_list)
   } else {
-    init_list[[1]]
+    table <- init_list[[1]]
   }
+
+  table %<>%
+    mutate(
+      label = ifelse(is.na(label), term, label),
+      type = ifelse(is.na(type) & level_order == 1, 'omitted', type)
+    )
+  order_split <- split(table, forcats::fct_inorder(factor(table$label)))
+  bind_rows(Map(
+    function(x) {
+      if (all(!is.na(x$level_order))) {
+        arrange(x, level_order)
+      } else {
+        x
+      }
+    },
+    order_split
+  ))
 }
 
 bottom_se <- function(reg, parens = TRUE) {
