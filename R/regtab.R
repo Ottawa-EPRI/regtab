@@ -63,9 +63,23 @@ regtab_single <- function(
   if (length(reg$xlevels) != 0) {
     table %<>%
       full_join(levels, by = 'term')
-
+  } else {
+    table %<>%
+      mutate(
+        label = NA_character_,
+        levels = NA_character_,
+        level_order = NA_integer_
+      )
   }
-  table
+
+  table %<>%
+    mutate(
+      label = ifelse(is.na(label), term, label),
+      type = ifelse(is.na(type) & level_order == 1, 'omitted', type)
+    )
+
+  table %>%
+    select(-term)
 }
 
 regtab <- function(
@@ -80,18 +94,16 @@ regtab <- function(
   )
   if (length(init_list) > 1) {
     table <-
-      Reduce(function(x, y) full_join(x, y, by = c('term', 'type')), init_list)
+      Reduce(
+        function(x, y) full_join(x, y, by = c('label', 'levels', 'level_order', 'type')),
+        init_list
+      )
   } else {
     table <- init_list[[1]]
   }
 
-  table %<>%
-    mutate(
-      label = ifelse(is.na(label), term, label),
-      type = ifelse(is.na(type) & level_order == 1, 'omitted', type)
-    )
   order_split <- split(table, forcats::fct_inorder(factor(table$label)))
-  bind_rows(Map(
+  table <- bind_rows(Map(
     function(x) {
       if (all(!is.na(x$level_order))) {
         arrange(x, level_order)
@@ -101,6 +113,15 @@ regtab <- function(
     },
     order_split
   ))
+
+  table %<>%
+    select(label, levels, level_order, type, everything())
+
+  # What a HACK. Separate out sumstat and non-sumstat types, only to splat
+  # them back on top.
+  table_nss <- filter(table, type != 'sumstat')
+  table_ss <- filter(table, type == 'sumstat')
+  bind_rows(table_nss, table_ss)
 }
 
 bottom_se <- function(reg, parens = TRUE) {
