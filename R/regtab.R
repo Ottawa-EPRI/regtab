@@ -48,7 +48,11 @@ regtab <- function(
     )
   if ('est.sig' %in% names(tidy_reg)) {
     tidy_reg %<>%
-      mutate(estimate = ifelse(is.na(est.sig) | est.sig == '', estimate, paste0(estimate, est.sig)))
+      mutate(
+        estimate = ifelse(
+          is.na(est.sig) | est.sig == '', estimate, paste0(estimate, est.sig)
+        )
+      )
   }
 
   sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
@@ -67,7 +71,9 @@ regtab <- function(
       full_join(level_df, by = 'term')
   } else {
     table %<>%
-      mutate(label = NA_character_, levels = NA_character_, level_order = NA_integer_)
+      mutate(
+        label = NA_character_, levels = NA_character_, level_order = NA_integer_
+      )
   }
 
   table %<>%
