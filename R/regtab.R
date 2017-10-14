@@ -26,7 +26,7 @@ regtab <- function(
   sumstat_vars = c('adj.r.squared', 'N')
 ) {
   if (length(reg$xlevels) != 0) {
-    levels <- retrieve_factor_labels(reg)
+    level_df <- retrieve_factor_labels(reg)
   }
 
   sumstats <- t(cbind(broom::glance(reg), N = nobs(reg)))
@@ -62,8 +62,13 @@ regtab <- function(
   table <- bind_rows(tidy_reg, sumstats)
 
   # FIXME: What if there are NO LEVELS
-  table %<>%
-    full_join(levels, by = 'term')
+  if (exists("level_df")) {
+    table %<>%
+      full_join(level_df, by = 'term')
+  } else {
+    table %<>%
+      mutate(label = NA_character_, levels = NA_character_, level_order = NA_integer_)
+  }
 
   table %<>%
     mutate(
@@ -73,7 +78,8 @@ regtab <- function(
 
   labels <- unique(table$label)
   table %<>%
-    left_join(tibble(label = labels, label_ix = seq_along(labels))) %>%
+    left_join(tibble(label = labels, label_ix = seq_along(labels)),
+              by = 'label') %>%
     arrange(label_ix, level_order)
 
   table %<>%
