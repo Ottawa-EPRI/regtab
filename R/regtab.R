@@ -23,8 +23,15 @@ retrieve_labels <- function(reg, tidy_reg) {
       names(reg_factor_levels),
       reg_factor_levels
     )
+    # FIXME: The issue is HERE. It adds all these extra rows which may not
+    # exist because of a full join. We need a join of ONLY what's actually
+    # in the regression + any omitteds.
     terms_no_interactions <- bind_rows(possible_names) %>%
-      full_join(terms_no_interactions, by = 'term')
+      full_join(
+        terms_no_interactions %>%
+          mutate(present = TRUE),
+        by = 'term'
+      )
   } else {
     terms_no_interactions %<>%
       mutate(
@@ -32,8 +39,11 @@ retrieve_labels <- function(reg, tidy_reg) {
       )
   }
 
-  terms_no_interactions %<>%
-    mutate(label = ifelse(is.na(label), term, label))
+  terms_no_interactions2 <- terms_no_interactions %>%
+    mutate(label = ifelse(is.na(label), term, label)) %>%
+    group_by(label) %>%
+      filter(any(present)) %>%
+    ungroup()
 
   if (!any(grepl(':', tidy_reg$term))) {
     table <- terms_no_interactions
@@ -84,12 +94,11 @@ retrieve_labels <- function(reg, tidy_reg) {
       distinct(omitted, .keep_all = TRUE) %>%
       select(label, levels = omitted) %>%
       mutate(level_order = 1)
-    browser()
     table_interactors %<>%
       select(-omitted) %>%
       full_join(omitted_table_interactors)
 
-    table <- full_join(terms_no_interactions, table_interactors)
+    table <- full_join(terms_no_interactions2, table_interactors)
   }
 
   in_model <- tidy_reg %>%
@@ -106,8 +115,9 @@ retrieve_labels <- function(reg, tidy_reg) {
       mutate(label_ix = 1:n())
     in_model %<>%
       left_join(unique_label_order, by = 'label') %>%
+      filter(!is.na(term)) %>%
       arrange(label_ix, level_order) %>%
-      select(-label_ix)
+      select(-label_ix, -present)
   }
 }
 
