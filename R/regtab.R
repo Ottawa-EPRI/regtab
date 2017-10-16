@@ -32,8 +32,36 @@ retrieve_labels <- function(reg, tidy_reg) {
       )
   }
 
-  terms_no_interactions %>%
-      mutate(label = ifelse(is.na(label), term, label))
+  terms_no_interactions %<>%
+    mutate(label = ifelse(is.na(label), term, label))
+
+  # If there are no interactions, we're done.
+  if (!any(grepl(':', tidy_reg$term))) {
+    return(terms_no_interactions)
+  }
+
+  interactors <- tidy_reg$term[grep(':', tidy_reg$term)]
+  # FIXME: omitted interactors, level order!
+  table_interactors <- Map(
+    function(x) {
+      int_terms <- Map(
+        function(y) {
+          left_join(data.frame(term = as.character(y)), terms_no_interactions, by = 'term')
+        },
+        x
+      )
+      data.frame(
+        term = Reduce(function(x, y) paste0(x$term, ':', y$term), int_terms),
+        label = Reduce(function(x, y) paste0(x$label, ' * ', y$label), int_terms),
+        levels = Reduce(function(x, y) paste0(x$levels, ' * ', y$levels), int_terms)
+      )
+    },
+    strsplit(interactors, ':')
+  ) %>%
+    bind_rows()
+
+  # level order will _not_ be correct here.
+  full_join(terms_no_interactions, table_interactors)
 }
 
 regtab <- function(
@@ -62,6 +90,7 @@ regtab <- function(
       std.error = formatC(std.error, digits = digits, format = 'f'),
       type = 'coef/se'
     )
+
   if ('est.sig' %in% names(tidy_reg)) {
     tidy_reg %<>%
       mutate(
@@ -81,15 +110,6 @@ regtab <- function(
     rename(term = rowname, estimate = V1)
   table <- bind_rows(tidy_reg, sumstats) %>%
     full_join(level_df, by = 'term')
-
-  # FIXME: What if there are NO LEVELS
-  # FIXME X 2
-  #if (exists("level_df")) {
-  #  table %<>%
-  #    full_join(level_df, by = 'term')
-  #} else {
-  #  table %<>%
-  #}
 
   table %<>%
     mutate(
@@ -112,3 +132,4 @@ regtab <- function(
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
+z <- lm(Sepal.Length ~ factor(Sepal.Width) * Species, data = iris)
