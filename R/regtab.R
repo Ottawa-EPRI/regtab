@@ -57,8 +57,15 @@ retrieve_labels <- function(reg, tidy_reg) {
                         int_terms),
           label = Reduce(function(x, y) paste0(x$label, ' * ', y$label),
                          int_terms),
-          levels = Reduce(function(x, y) paste0(x$levels, ' * ', y$levels),
-                          int_terms),
+          levels = Reduce(
+            function(x, y) {
+              if (is.na(x$levels) & is.na(y$levels)) NA_integer_
+              else if (!is.na(x$levels) & is.na(y$levels)) paste0(x$levels, ' * ', y$label)
+              else if (is.na(x$levels) & !is.na(y$levels)) paste0(x$label, ' * ', y$levels)
+              else paste0(x$levels, ' * ', y$levels)
+            },
+            int_terms
+          ),
           omitted = Reduce(
             function(x, y) {
               x_omit <- terms_no_interactions %>% filter(label == x$label, level_order == 1)
@@ -74,9 +81,10 @@ retrieve_labels <- function(reg, tidy_reg) {
       bind_rows()
 
     omitted_table_interactors <- table_interactors %>%
-      distinct(label, omitted) %>%
-      rename(levels = omitted) %>%
+      distinct(omitted, .keep_all = TRUE) %>%
+      select(label, levels = omitted) %>%
       mutate(level_order = 1)
+    browser()
     table_interactors %<>%
       select(-omitted) %>%
       full_join(omitted_table_interactors)
@@ -87,9 +95,10 @@ retrieve_labels <- function(reg, tidy_reg) {
   in_model <- tidy_reg %>%
     select(term) %>%
     left_join(table, by = 'term')
-  # FIXME: We also need omitted + proper sort.
+
   omitted_levels <- table %>%
     filter(level_order == 1)
+
   if (nrow(omitted_levels) > 0) {
     in_model %<>% bind_rows(omitted_levels)
     unique_label_order <- in_model %>%
