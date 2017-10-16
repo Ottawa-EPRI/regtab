@@ -52,18 +52,34 @@ retrieve_labels <- function(reg, tidy_reg) {
           },
           x
         )
-        data.frame(
+        tibble(
           term = Reduce(function(x, y) paste0(x$term, ':', y$term),
                         int_terms),
           label = Reduce(function(x, y) paste0(x$label, ' * ', y$label),
                          int_terms),
           levels = Reduce(function(x, y) paste0(x$levels, ' * ', y$levels),
-                          int_terms)
+                          int_terms),
+          omitted = Reduce(
+            function(x, y) {
+              x_omit <- terms_no_interactions %>% filter(label == x$label, level_order == 1)
+              y_omit <- terms_no_interactions %>% filter(label == y$label, level_order == 1)
+              paste0(x_omit$levels, ' * ', y_omit$levels)
+            },
+            int_terms
+          )
         )
       },
       strsplit(interactors, ':')
     ) %>%
       bind_rows()
+
+    omitted_table_interactors <- table_interactors %>%
+      distinct(label, omitted) %>%
+      rename(levels = omitted) %>%
+      mutate(level_order = 1)
+    table_interactors %<>%
+      select(-omitted) %>%
+      full_join(omitted_table_interactors)
 
     table <- full_join(terms_no_interactions, table_interactors)
   }
