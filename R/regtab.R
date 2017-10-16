@@ -72,7 +72,18 @@ retrieve_labels <- function(reg, tidy_reg) {
     select(term) %>%
     left_join(table, by = 'term')
   # FIXME: We also need omitted + proper sort.
-  browser()
+  omitted_levels <- table %>%
+    filter(level_order == 1)
+  if (nrow(omitted_levels) > 0) {
+    in_model %<>% bind_rows(omitted_levels)
+    unique_label_order <- in_model %>%
+      distinct(label) %>%
+      mutate(label_ix = 1:n())
+    in_model %<>%
+      left_join(unique_label_order, by = 'label') %>%
+      arrange(label_ix, level_order) %>%
+      select(-label_ix)
+  }
 }
 
 regtab <- function(
