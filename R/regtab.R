@@ -35,33 +35,44 @@ retrieve_labels <- function(reg, tidy_reg) {
   terms_no_interactions %<>%
     mutate(label = ifelse(is.na(label), term, label))
 
-  # If there are no interactions, we're done.
   if (!any(grepl(':', tidy_reg$term))) {
-    return(terms_no_interactions)
+    table <- terms_no_interactions
+  } else {
+    interactors <- tidy_reg$term[grep(':', tidy_reg$term)]
+    # FIXME: omitted interactors, level order!
+    table_interactors <- Map(
+      function(x) {
+        int_terms <- Map(
+          function(y) {
+            left_join(
+              data.frame(term = as.character(y)),
+              terms_no_interactions,
+              by = 'term'
+            )
+          },
+          x
+        )
+        data.frame(
+          term = Reduce(function(x, y) paste0(x$term, ':', y$term),
+                        int_terms),
+          label = Reduce(function(x, y) paste0(x$label, ' * ', y$label),
+                         int_terms),
+          levels = Reduce(function(x, y) paste0(x$levels, ' * ', y$levels),
+                          int_terms)
+        )
+      },
+      strsplit(interactors, ':')
+    ) %>%
+      bind_rows()
+
+    table <- full_join(terms_no_interactions, table_interactors)
   }
 
-  interactors <- tidy_reg$term[grep(':', tidy_reg$term)]
-  # FIXME: omitted interactors, level order!
-  table_interactors <- Map(
-    function(x) {
-      int_terms <- Map(
-        function(y) {
-          left_join(data.frame(term = as.character(y)), terms_no_interactions, by = 'term')
-        },
-        x
-      )
-      data.frame(
-        term = Reduce(function(x, y) paste0(x$term, ':', y$term), int_terms),
-        label = Reduce(function(x, y) paste0(x$label, ' * ', y$label), int_terms),
-        levels = Reduce(function(x, y) paste0(x$levels, ' * ', y$levels), int_terms)
-      )
-    },
-    strsplit(interactors, ':')
-  ) %>%
-    bind_rows()
-
-  # level order will _not_ be correct here.
-  full_join(terms_no_interactions, table_interactors)
+  in_model <- tidy_reg %>%
+    select(term) %>%
+    left_join(table, by = 'term')
+  # FIXME: We also need omitted + proper sort.
+  browser()
 }
 
 regtab <- function(
@@ -128,8 +139,10 @@ regtab <- function(
     select(label, levels, level_order, everything())
 
   table
+
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
 z <- lm(Sepal.Length ~ factor(Sepal.Width) * Species, data = iris)
+z <- lm(Sepal.Length ~ factor(Sepal.Width):Species, data = iris)
