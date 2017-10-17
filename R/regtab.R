@@ -6,6 +6,22 @@ add_interact_level_order <- function(x) {
   }
 }
 
+get_core_labels <- function(xlevels, tidy_reg) {
+   Map(
+    function(x, y) {
+      data.frame(
+        term = paste0(x, y),
+        label = x,
+        levels = y
+      ) %>%
+        mutate(level_order = 1:n()) %>%
+        mutate_if(is.factor, as.character)
+    },
+    names(xlevels),
+    xlevels
+  )
+}
+
 retrieve_labels <- function(reg, tidy_reg) {
   reg_factor_levels <- reg$xlevels
 
