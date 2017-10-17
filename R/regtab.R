@@ -1,3 +1,11 @@
+add_interact_level_order <- function(x) {
+  if (length(x) > 1 && x[1] == 1 && all(is.na(x[2:length(x)]))) {
+    1:length(x)
+  } else {
+    x
+  }
+}
+
 retrieve_labels <- function(reg, tidy_reg) {
   reg_factor_levels <- reg$xlevels
 
@@ -116,7 +124,10 @@ retrieve_labels <- function(reg, tidy_reg) {
     in_model %<>%
       left_join(unique_label_order, by = 'label') %>%
       arrange(label_ix, level_order) %>%
-      select(-label_ix, -present)
+      select(-label_ix, -present) %>%
+      group_by(label) %>%
+        mutate(level_order = add_interact_level_order(level_order)) %>%
+      ungroup()
   }
   in_model
 }
