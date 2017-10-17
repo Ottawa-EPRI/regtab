@@ -1,3 +1,8 @@
+library(purrr)
+library(dplyr)
+library(magrittr)
+library(tibble)
+
 add_interact_level_order <- function(x) {
   if (length(x) > 1 && x[1] == 1 && all(is.na(x[2:length(x)]))) {
     1:length(x)
@@ -6,13 +11,13 @@ add_interact_level_order <- function(x) {
   }
 }
 
-get_core_labels <- function(xlevels, tidy_reg) {
-   Map(
+get_core_levels <- function(xlevels) {
+   xlevels <- Map(
     function(x, y) {
       data.frame(
         term = paste0(x, y),
         label = x,
-        levels = y
+        flevels = y
       ) %>%
         mutate(level_order = 1:n()) %>%
         mutate_if(is.factor, as.character)
@@ -20,6 +25,56 @@ get_core_labels <- function(xlevels, tidy_reg) {
     names(xlevels),
     xlevels
   )
+  xlevels <- bind_rows(xlevels)
+  if (length(xlevels) == 0) {
+    xlevels <- tibble(
+      term = NA_character_,
+      label = NA_character_,
+      flevels = NA_character_
+    )
+  }
+}
+
+get_interacted_levels <- function(term, xlevels) {
+  interactions <- term[grep(':', term)]
+  split_interactions <- strsplit(interactions, ':')
+  core_levels <- bind_rows(get_core_levels(xlevels))
+  interact_tibble <- Map(
+    function(x)
+    Map(
+      function(y) {
+        tibble(term = y) %>%
+          left_join(core_levels, by = 'term') %>%
+          mutate(
+            is_factor = !is.na(flevels),
+            label = ifelse(is.na(label), term, label),
+            flevels = ifelse(is.na(flevels), label, flevels)
+          )
+      },
+      x,
+      USE.NAMES = FALSE
+    ),
+    split_interactions
+  )
+
+  interact_reduce <- Map(
+    function(x)
+      Reduce(
+        function(a, b) {
+          tibble(
+            term = sprintf('%s:%s', a$term, b$term),
+            label = sprintf('%s * %s', a$label, b$label),
+            flevels = sprintf('%s * %s', a$flevels, b$flevels),
+            level_order = NA_integer_,
+            is_factor = any(a$is_factor, b$is_factor)
+          )
+        },
+        x
+      ),
+    interact_tibble
+  )
+  bind_rows(interact_reduce) %>%
+    filter(is_factor != FALSE)
 }
 
 retrieve_labels <- function(reg, tidy_reg) {
@@ -205,3 +260,5 @@ z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
 z <- lm(Sepal.Length ~ factor(Sepal.Width) * Species, data = iris)
 z <- lm(Sepal.Length ~ factor(Sepal.Width):Species, data = iris)
+z <- lm(Sepal.Length ~ Sepal.Width:Petal.Width, data = iris)
+z <- lm(Sepal.Length ~ factor(Sepal.Width):Species + Species:Petal.Length + factor(Sepal.Width):Species:Petal.Length, data = iris)
