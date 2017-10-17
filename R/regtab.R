@@ -164,28 +164,14 @@ regtab <- function(
     ) %>%
     mutate_all(as.character) %>%
     filter(rowname %in% sumstat_vars) %>%
-    rename(term = rowname, estimate = V1)
-  table <- bind_rows(tidy_reg, sumstats) %>%
-    full_join(level_df, by = 'term')
-
-  table %<>%
-    mutate(
-      label = ifelse(is.na(label), term, label),
-      type = ifelse(is.na(type) & level_order == 1, 'omitted', type)
-    )
-
-  labels <- unique(table$label)
-  table %<>%
-    left_join(tibble(label = labels, label_ix = seq_along(labels)),
-              by = 'label') %>%
-    arrange(label_ix, level_order)
-
-  table %<>%
+    rename(label = rowname, estimate = V1)
+  table <- level_df %>%
+    left_join(tidy_reg, by = 'term') %>%
+    bind_rows(sumstats) %>%
     select(-matches('term|statistic|p.value|label_ix|est.sig')) %>%
     select(label, levels, level_order, everything())
 
   table
-
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
