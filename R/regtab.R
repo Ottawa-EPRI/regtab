@@ -3,14 +3,6 @@ library(dplyr)
 library(magrittr)
 library(tibble)
 
-add_interact_level_order <- function(x) {
-  if (length(x) > 1 && x[1] == 1 && all(is.na(x[2:length(x)]))) {
-    1:length(x)
-  } else {
-    x
-  }
-}
-
 get_core_levels <- function(xlevels) {
    xlevels <- Map(
     function(x, y) {
@@ -33,6 +25,7 @@ get_core_levels <- function(xlevels) {
       flevels = NA_character_
     )
   }
+  xlevels
 }
 
 get_interacted_levels <- function(term, xlevels) {
@@ -73,8 +66,17 @@ get_interacted_levels <- function(term, xlevels) {
       ),
     interact_tibble
   )
-  bind_rows(interact_reduce) %>%
+  inter_table <- bind_rows(interact_reduce) %>%
     filter(is_factor != FALSE)
+
+  if (nrow(inter_table) > 0) {
+    inter_table <- inter_table %>%
+      group_by(label) %>%
+        mutate(level_order = (1:n() + 1)) %>%
+      ungroup()
+  }
+  inter_table %>%
+    select(-is_factor)
 }
 
 retrieve_labels <- function(reg, tidy_reg) {
