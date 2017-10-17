@@ -115,10 +115,10 @@ retrieve_labels <- function(reg, tidy_reg) {
       mutate(label_ix = 1:n())
     in_model %<>%
       left_join(unique_label_order, by = 'label') %>%
-      filter(!is.na(term)) %>%
       arrange(label_ix, level_order) %>%
       select(-label_ix, -present)
   }
+  in_model
 }
 
 regtab <- function(
