@@ -69,21 +69,14 @@ get_interacted_omitted <- function(inter_table, xlevels) {
     distinct(label)
 
   table_labels <- strsplit(inter_table$label, ' * ', fixed = TRUE)
-  lv <- Map(
-    function(x) {
-      omitteds <- Map(
-        function(y) {
-          match_ix <- match(y, names(xlevels))
-          if (!is.na(match_ix)) xlevels[[match_ix]][1] else NULL
-        },
-        x
-      )
-      omitteds <- Filter(function(x) !is.null(x), omitteds)
-      paste0(omitteds, collapse = ' * ')
-    }, table_labels
+  lv <- map_chr(
+    table_labels,
+    ~ map(.x, ~ xlevels[[.x]][1]) %>%
+        keep(~ !is.null(.x)) %>%
+        paste0(collapse = ' * ')
   )
 
-  tibble(label = inter_table$label, flevels = unlist(lv), level_order = 1)
+  tibble(label = inter_table$label, flevels = lv, level_order = 1)
 }
 
 regtab <- function(
