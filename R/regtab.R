@@ -80,7 +80,7 @@ get_interacted_omitted <- function(inter_table, xlevels) {
       )
       omitteds <- Filter(function(x) !is.null(x), omitteds)
       paste0(omitteds, collapse = ' * ')
-    }, ss
+    }, table_labels
   )
 
   tibble(label = inter_table$label, flevels = unlist(lv), level_order = 1)
