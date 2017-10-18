@@ -67,16 +67,18 @@ get_interacted_levels <- function(term, xlevels) {
     interact_tibble
   )
   inter_table <- bind_rows(interact_reduce) %>%
-    filter(is_factor != FALSE)
+    filter(is_factor != FALSE) %>%
+    select(-is_factor)
 
   if (nrow(inter_table) > 0) {
     inter_table <- inter_table %>%
       group_by(label) %>%
         mutate(level_order = (1:n() + 1)) %>%
       ungroup()
+    omitted <- get_interacted_omitted(inter_table, xlevels)
+    inter_table <- bind_rows(inter_table, omitted)
   }
-  inter_table %>%
-    select(-is_factor)
+  inter_table
 }
 
 retrieve_labels <- function(reg, tidy_reg) {
