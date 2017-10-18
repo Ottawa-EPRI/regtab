@@ -4,26 +4,15 @@ library(magrittr)
 library(tibble)
 
 get_core_levels <- function(xlevels) {
-   xlevels <- Map(
-    function(x, y) {
-      data.frame(
-        term = paste0(x, y),
-        label = x,
-        flevels = y
-      ) %>%
+   xlevels <- bind_rows(map2_df(
+    names(xlevels), xlevels,
+    ~ tibble(term = paste0(.x, .y), label = .x, flevels = .y) %>%
         mutate(level_order = 1:n()) %>%
         mutate_if(is.factor, as.character)
-    },
-    names(xlevels),
-    xlevels
-  )
-  xlevels <- bind_rows(xlevels)
+  ))
   if (length(xlevels) == 0) {
-    xlevels <- tibble(
-      term = NA_character_,
-      label = NA_character_,
-      flevels = NA_character_
-    )
+    c(chr, int) %<-% list(character(), integer())
+    xlevels <- tibble(term = chr, label = chr, flevels = chr, level_order = int)
   }
   xlevels
 }
