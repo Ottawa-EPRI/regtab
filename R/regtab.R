@@ -5,10 +5,10 @@ library(tibble)
 
 get_core_levels <- function(xlevels) {
    xlevels <- bind_rows(map2_df(
-    names(xlevels), xlevels,
-    ~ tibble(term = paste0(.x, .y), label = .x, flevels = .y) %>%
-        mutate(level_order = 1:n()) %>%
-        mutate_if(is.factor, as.character)
+     names(xlevels), xlevels,
+     ~ tibble(term = paste0(.x, .y), label = .x, flevels = .y) %>%
+         mutate(level_order = 1:n()) %>%
+         mutate_if(is.factor, as.character)
   ))
   if (length(xlevels) == 0) {
     c(chr, int) %<-% list(character(), integer())
