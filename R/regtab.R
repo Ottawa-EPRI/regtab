@@ -18,43 +18,37 @@ get_core_levels <- function(xlevels) {
 }
 
 get_interacted_levels <- function(term, xlevels) {
-  interactions <- term[grep(':', term)]
-  split_interactions <- strsplit(interactions, ':')
-  core_levels <- bind_rows(get_core_levels(xlevels))
-  interact_tibble <- Map(
-    function(x)
-    Map(
-      function(y) {
-        tibble(term = y) %>%
+  split_interactions <- term[grep(':', term)] %>%
+    strsplit(':', fixed = TRUE)
+  core_levels <- get_core_levels(xlevels)
+  interact_tibble <- map(
+    split_interactions,
+    ~ map(
+      .x,
+      ~ tibble(term = .x) %>%
           left_join(core_levels, by = 'term') %>%
           mutate(
             is_factor = !is.na(flevels),
             label = ifelse(is.na(label), term, label),
             flevels = ifelse(is.na(flevels), label, flevels)
           )
-      },
-      x,
-      USE.NAMES = FALSE
-    ),
-    split_interactions
+    )
   )
 
-  interact_reduce <- Map(
-    function(x)
-      Reduce(
-        function(a, b) {
-          tibble(
-            term = sprintf('%s:%s', a$term, b$term),
-            label = sprintf('%s * %s', a$label, b$label),
-            flevels = sprintf('%s * %s', a$flevels, b$flevels),
+  interact_reduce <- map(
+    interact_tibble,
+    ~ reduce(
+        .x,
+        ~ tibble(
+            term = sprintf('%s:%s', .x$term, .y$term),
+            label = sprintf('%s * %s', .x$label, .y$label),
+            flevels = sprintf('%s * %s', .x$flevels, .y$flevels),
             level_order = NA_integer_,
-            is_factor = any(a$is_factor, b$is_factor)
+            is_factor = any(.x$is_factor, .y$is_factor)
           )
-        },
-        x
-      ),
-    interact_tibble
+    )
   )
+
   inter_table <- bind_rows(interact_reduce) %>%
     filter(is_factor != FALSE) %>%
     select(-is_factor)
@@ -91,8 +85,6 @@ get_interacted_omitted <- function(inter_table, xlevels) {
 
   tibble(label = inter_table$label, flevels = unlist(lv), level_order = 1)
 }
-
-
 
 regtab <- function(
   reg,
