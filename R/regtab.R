@@ -70,6 +70,19 @@ get_interacted_levels <- function(term, xlevels) {
   inter_table
 }
 
+get_interacted_omitted <- function(inter_table, xlevels) {
+  inter_table <- inter_table %>%
+    distinct(label)
+
+  table_labels <- strsplit(inter_table$label, ' * ', fixed = TRUE)
+  lv <- Map(
+    function(x) {
+      omitteds <- Map(
+        function(y) {
+          match_ix <- match(y, names(xlevels))
+          if (!is.na(match_ix)) xlevels[[match_ix]][1] else NULL
+        },
+        x
 retrieve_labels <- function(reg, tidy_reg) {
   reg_factor_levels <- reg$xlevels
 
@@ -109,6 +122,10 @@ retrieve_labels <- function(reg, tidy_reg) {
       mutate(
         label = NA_character_, levels = NA_character_, level_order = NA_integer_
       )
+      omitteds <- Filter(function(x) !is.null(x), omitteds)
+      paste0(omitteds, collapse = ' * ')
+    }, ss
+  )
   }
 
   terms_no_interactions2 <- terms_no_interactions %>%
@@ -173,6 +190,8 @@ retrieve_labels <- function(reg, tidy_reg) {
     table <- full_join(terms_no_interactions2, table_interactors)
   }
 
+  tibble(label = inter_table$label, flevels = unlist(lv), level_order = 1)
+}
   in_model <- tidy_reg %>%
     select(term) %>%
     left_join(table, by = 'term')
