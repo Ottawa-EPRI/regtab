@@ -68,9 +68,8 @@ get_interacted_omitted <- function(inter_table, xlevels) {
   inter_table <- inter_table %>%
     distinct(label)
 
-  table_labels <- strsplit(inter_table$label, ' * ', fixed = TRUE)
   lv <- map_chr(
-    table_labels,
+    strsplit(inter_table$label, ' * ', fixed = TRUE),
     ~ map(.x, ~ xlevels[[.x]][1]) %>%
         keep(~ !is.null(.x)) %>%
         paste0(collapse = ' * ')
