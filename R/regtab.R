@@ -161,11 +161,23 @@ reg_format <- function(
       reg_table,
       match_vars,
       funs(
-        ifelse(type != 'sumstatN', formatC(., digits = digits, format = 'f'), .)
+        ifelse(
+          type != 'sumstatN',
+          ifelse(
+            is.na(.), NA_character_, formatC(., digits = digits, format = 'f')
+          ),
+          .
+        )
       )
     )
   } else {
-    mutate_at(reg_table, match_vars, formatC, digits = digits, format = 'f')
+    mutate_at(
+      reg_table,
+      match_vars,
+      ~ ifelse(
+        is.na(.x), NA_character_, formatC(.x, digits = digits, format = 'f')
+      )
+    )
   }
 }
 
