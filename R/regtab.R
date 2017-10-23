@@ -159,30 +159,19 @@ reg_format <- function(
   exclude_n = TRUE
 ) {
   match_vars <- vars(matches('estimate|std\\.error|p\\.value'))
+
+  na_formatC <- function(x) {
+    ifelse(is.na(x), NA_character_, formatC(x, digits = digits, format = 'f'))
+  }
+
   if (exclude_n) {
-    mutate_at(
-      reg_table,
-      match_vars,
-      funs(
-        ifelse(
-          type != 'sumstatN',
-          ifelse(
-            is.na(.), NA_character_, formatC(., digits = digits, format = 'f')
-          ),
-          .
-        )
-      )
-    )
+    mutate_at(reg_table, match_vars,
+              funs(ifelse(type != 'sumstatN', na_formatC(.), .)))
   } else {
-    mutate_at(
-      reg_table,
-      match_vars,
-      ~ ifelse(
-        is.na(.x), NA_character_, formatC(.x, digits = digits, format = 'f')
-      )
-    )
+    mutate_at(reg_table, match_vars, na_formatC)
   }
 }
+
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
