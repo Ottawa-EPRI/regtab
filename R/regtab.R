@@ -79,7 +79,9 @@ get_interacted_omitted <- function(inter_table, xlevels) {
 
 regtab <- function(
   reg,
-  pvals = c(`*` = 0.05, `**` = 0.01, `***` = 0.001)
+  pvals = c(`*` = 0.05, `**` = 0.01, `***` = 0.001),
+  digits = 3,
+  exclude_n = TRUE
 ) {
 
   # Get the initial model and summary statistics.
@@ -147,7 +149,8 @@ regtab <- function(
     sumstats %>%
       mutate(type = ifelse(label == 'N', 'sumstatN', 'sumstat'))
   ) %>%
-    select(-matches('statistic'))
+    select(-matches('statistic')) %>%
+    reg_format(digits = digits, exclude_n = exclude_n)
 }
 
 reg_format <- function(
