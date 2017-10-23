@@ -19,6 +19,10 @@ get_core_levels <- function(xlevels) {
 get_interacted_levels <- function(term, xlevels) {
   split_interactions <- term[grep(':', term)] %>%
     strsplit(':', fixed = TRUE)
+  if (length(split_interactions) == 0) {
+    return(NULL)
+  }
+
   core_levels <- get_core_levels(xlevels)
   interact_tibble <- map(
     split_interactions,
