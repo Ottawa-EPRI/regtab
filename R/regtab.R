@@ -155,7 +155,7 @@ reg_format <- function(
   digits = 3,
   exclude_n = TRUE
 ) {
-  match_vars <- vars(matches('estimate|std\\.error||p\\.value'))
+  match_vars <- vars(matches('estimate|std\\.error|p\\.value'))
   if (exclude_n) {
     mutate_at(
       reg_table,
