@@ -129,7 +129,9 @@ regtab <- function(
     sorted_p <- sort(pvals, decreasing = TRUE)
     for (i in seq_along(sorted_p)) {
       tidy_table <- tidy_table %>% mutate(
-        est.sig = if_else(p.value <= sorted_p[i], names(sorted_p)[i], '')
+        est.sig = if_else(
+          p.value <= sorted_p[i], names(sorted_p)[i], NA_character_
+        )
       )
     }
   }
