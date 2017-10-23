@@ -124,49 +124,47 @@ regtab <- function(
     select(-label_order, -term) %>%
     select(label, flevels, level_order, everything())
 
-  browser()
+  # Add est.sig stars if desired.
+  if (!is.null(pvals)) {
+    sorted_p <- sort(pvals, decreasing = TRUE)
+    for (i in seq_along(sorted_p)) {
+      tidy_table <- tidy_table %>% mutate(
+        est.sig = if_else(p.value <= sorted_p[i], names(sorted_p)[i], '')
+      )
+    }
+  }
 
-#  level_df <- retrieve_labels(reg, tidy_reg)
-#  if (!is.null(pvals)) {
-#    sorted_p <- sort(pvals, decreasing = TRUE)
-#    for (i in seq_along(sorted_p)) {
-#      tidy_reg %<>% mutate(
-#        est.sig = if_else(p.value <= sorted_p[i], names(sorted_p)[i], '')
-#      )
-#    }
-#  }
-#
-#  tidy_reg %<>%
-#    mutate(
-#      estimate = formatC(estimate, digits = digits, format = 'f'),
-#      std.error = formatC(std.error, digits = digits, format = 'f'),
-#      type = 'coef/se'
-#    )
-#
-#  if ('est.sig' %in% names(tidy_reg)) {
-#    tidy_reg %<>%
-#      mutate(
-#        estimate = ifelse(
-#          is.na(est.sig) | est.sig == '', estimate, paste0(estimate, est.sig)
-#        )
-#      )
-#  }
-#
-#  sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
-#    mutate(
-#      V1 = paste0(formatC(V1, digits = digits, format = 'f')),
-#      type = 'sumstat'
-#    ) %>%
-#    mutate_all(as.character) %>%
-#    filter(rowname %in% sumstat_vars) %>%
-#    rename(label = rowname, estimate = V1)
-#  table <- level_df %>%
-#    left_join(tidy_reg, by = 'term') %>%
-#    bind_rows(sumstats) %>%
-#    select(-matches('term|statistic|p.value|label_ix|est.sig')) %>%
-#    select(label, levels, level_order, everything())
-#
-#  table
+  # Format estimates and standard errors.
+  tidy_table <- tidy_table %>%
+    mutate(
+      estimate = formatC(estimate, digits = digits, format = 'f'),
+      std.error = formatC(std.error, digits = digits, format = 'f'),
+      type = 'coef/se'
+    )
+
+  # Join est.sig stars to estimate, if applicable.
+  if ('est.sig' %in% names(tidy_table)) {
+    tidy_table <- tidy_table %>%
+      mutate(
+        estimate = ifelse(
+          is.na(est.sig) | est.sig == '', estimate, paste0(estimate, est.sig)
+        )
+      )
+  }
+
+  # Properly reform sumstats.
+  sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
+    mutate(
+      V1 = paste0(formatC(V1, digits = digits, format = 'f')),
+      type = 'sumstat'
+    ) %>%
+    mutate_all(as.character) %>%
+    filter(rowname %in% sumstat_vars) %>%
+    rename(label = rowname, estimate = V1)
+
+  # Return stacked tidy_table and sumstats.
+  bind_rows(tidy_table, sumstats) %>%
+    select(-matches('statistic|p.value|est.sig|p\\.value'))
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
