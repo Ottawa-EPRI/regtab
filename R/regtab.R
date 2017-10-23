@@ -178,6 +178,25 @@ reg_format <- function(
   }
 }
 
+combine_reg <- function(reg_list) {
+  regs <- map2(
+    reg_list, letters[1:length(reg_list)],
+    ~ rename_at(
+        .x,
+        vars(matches('estimate|std\\.error|p\\.value|est\\.sig')),
+        function(r) paste0(r, '.', .y)
+      )
+  )
+  combined_regs <- reduce(
+    regs,
+    ~ full_join(.x, .y, by = c('label', 'flevels', 'level_order', 'type'))
+  )
+  sumstats <- combined_regs %>% filter(type %in% c('sumstat', 'sumstatN'))
+  combined_regs %>%
+    filter(!type %in% c('sumstat', 'sumstatN')) %>%
+    bind_rows(sumstats)
+}
+
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
