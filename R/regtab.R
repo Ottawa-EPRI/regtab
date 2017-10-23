@@ -84,9 +84,14 @@ regtab <- function(
   sumstat_vars = c('adj.r.squared', 'N')
 ) {
 
+  # Get the initial model and summary statistics.
   sumstats <- t(cbind(broom::glance(reg), N = nobs(reg)))
   tidy_reg <- broom::tidy(reg)
 
+  # Get all possible levels and interacted levels. Get the list of continous
+  # variables as well, and add label to equal to term. This way we have a list
+  # of all possible variables. We'll also get a separate df of just the omitted
+  # variables.
   core_levels <- get_core_levels(reg$xlevels)
   interacted_levels <- get_interacted_levels(tidy_reg$term, reg$xlevels)
   all_possible_levels <- bind_rows(core_levels, interacted_levels)
@@ -97,11 +102,19 @@ regtab <- function(
   all_possible_omitted_vars <- all_possible_vars %>%
     filter(level_order == 1)
 
+  # Join the tidy_reg to all possible vars, thereby getting proper labels and
+  # level orders. We need to separately look for which omitted terms need to
+  # come along, and then bind those together.
   tidy_reg <- tidy_reg %>%
     left_join(all_possible_vars, by = 'term')
   omitted_vars <- semi_join(all_possible_omitted_vars, tidy_reg, by = 'label')
   tidy_table <- bind_rows(tidy_reg, omitted_vars)
 
+  # Since any of the the omitted labels will come at the bottom, we need to
+  # have a separate table with the proper label order (i.e., the original
+  # tidy_reg label order), and then use the unique order to order the labels,
+  # using level order as a second categorization, thus properly ordering the
+  # omitted vars (if any). Then we can clean up the column order.
   unique_labels <- unique(tidy_table$label)
   label_order <- tibble(
     label = unique_labels, label_order = seq_along(unique_labels)
