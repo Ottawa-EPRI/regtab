@@ -155,7 +155,7 @@ regtab <- function(
     sumstats %>%
       mutate(type = ifelse(label == 'N', 'sumstatN', 'sumstat'))
   ) %>%
-    select(-matches('statistic')) %>%
+    select(-matches('statistic|is_factor')) %>%
     reg_format(digits = digits, exclude_n = exclude_n)
 }
 
