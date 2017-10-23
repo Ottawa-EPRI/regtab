@@ -150,6 +150,23 @@ regtab <- function(
     select(-matches('statistic'))
 }
 
+reg_format <- function(
+  reg_table,
+  digits = 3,
+  exclude_n = TRUE
+) {
+  match_vars <- vars(matches('estimate|std\\.error||p\\.value'))
+  if (exclude_n) {
+    mutate_at(
+      reg_table,
+      match_vars,
+      funs(
+        ifelse(type != 'sumstatN', formatC(., digits = digits, format = 'f'), .)
+      )
+    )
+  } else {
+    mutate_at(reg_table, match_vars, formatC, digits = digits, format = 'f')
+  }
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
