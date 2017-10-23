@@ -79,9 +79,7 @@ get_interacted_omitted <- function(inter_table, xlevels) {
 
 regtab <- function(
   reg,
-  digits = 3,
-  pvals = c(`*` = 0.05, `**` = 0.01, `***` = 0.001),
-  sumstat_vars = c('adj.r.squared', 'N')
+  pvals = c(`*` = 0.05, `**` = 0.01, `***` = 0.001)
 ) {
 
   # Get the initial model and summary statistics.
@@ -134,37 +132,24 @@ regtab <- function(
     }
   }
 
-  # Format estimates and standard errors.
-  tidy_table <- tidy_table %>%
-    mutate(
-      estimate = formatC(estimate, digits = digits, format = 'f'),
-      std.error = formatC(std.error, digits = digits, format = 'f'),
-      type = 'coef/se'
-    )
-
-  # Join est.sig stars to estimate, if applicable.
-  if ('est.sig' %in% names(tidy_table)) {
-    tidy_table <- tidy_table %>%
-      mutate(
-        estimate = ifelse(
-          is.na(est.sig) | est.sig == '', estimate, paste0(estimate, est.sig)
-        )
-      )
-  }
-
   # Properly reform sumstats.
   sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
-    mutate(
-      V1 = paste0(formatC(V1, digits = digits, format = 'f')),
-      type = 'sumstat'
-    ) %>%
-    mutate_all(as.character) %>%
-    filter(rowname %in% sumstat_vars) %>%
     rename(label = rowname, estimate = V1)
 
   # Return stacked tidy_table and sumstats.
-  bind_rows(tidy_table, sumstats) %>%
-    select(-matches('statistic|p.value|est.sig|p\\.value'))
+  bind_rows(
+    tidy_table %>%
+      mutate(
+        type = ifelse(
+          level_order == 1 & !is.na(level_order), 'omitted', 'coef/se'
+        )
+      ),
+    sumstats %>%
+      mutate(type = ifelse(label == 'N', 'sumstatN', 'sumstat'))
+  ) %>%
+    select(-matches('statistic'))
+}
+
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
