@@ -126,7 +126,7 @@ regtab <- function(
   tidy_table <- left_join(tidy_table, label_order, by = 'label') %>%
     arrange(label_order, level_order) %>%
     select(-label_order, -term) %>%
-    select(label, flevels, level_order, everything())
+    select(label, flevels, level_order, type, everything())
 
   # Add est.sig stars if desired.
   if (!is.null(pvals)) {
@@ -231,7 +231,7 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
   }
   reg_table <- select(reg_table, -matches('p\\.value'))
 
-  reg_table_bottom <- gather(
+  gather(
     reg_table, type2, estimate, -label, -flevels, -level_order, -type
   ) %>%
     left_join(label_tibble, by = 'label') %>%
@@ -245,7 +245,6 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
       TRUE ~ type
     )) %>%
     select(-order, -type2)
-  browser()
 }
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
