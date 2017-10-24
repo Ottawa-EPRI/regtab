@@ -146,7 +146,9 @@ regtab <- function(
   sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
     rename(label = rowname, estimate = V1)
 
-  # Return stacked tidy_table and sumstats.
+  # Return stacked tidy_table and sumstats. We will format the digits here
+  # because this seems the most logical place to do it and only _then_ add the
+  # sig stars (if desired), because we can't do it before we format.
   bind_rows(
     tidy_table %>%
       mutate(
@@ -157,8 +159,11 @@ regtab <- function(
     sumstats %>%
       mutate(type = ifelse(label == 'N', 'sumstatN', 'sumstat'))
   ) %>%
-    select(-matches('statistic|is_factor')) %>%
-    reg_format(digits = digits, exclude_n = exclude_n)
+    reg_format(digits = digits, exclude_n = exclude_n) %>%
+    mutate(
+      estimate = ifelse(is.na(est.sig), estimate, paste0(estimate, est.sig))
+    ) %>%
+    select(-matches('statistic|is_factor|est\\.sig'))
 }
 
 reg_format <- function(
