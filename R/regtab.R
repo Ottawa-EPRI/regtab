@@ -209,6 +209,44 @@ combine_reg <- function(reg_list) {
     bind_rows(sumstats)
 }
 
+reg_bottom_se <- function(reg_table, p.value = FALSE) {
+  label_tibble <- tibble(
+    label = unique(reg_table$label), order = seq_along(label)
+  )
+
+  if (p.value) {
+    reg_table <- reg_table %>%
+      mutate(
+        std.error = ifelse(
+          !is.na(std.error) & !is.na(p.value),
+          paste0('(', std.error, ', ', p.value, ')'),
+          ifelse(!is.na(std.error), paste0('(', std.error, ')'), NA)
+        )
+      )
+  } else {
+    reg_table <- reg_table %>%
+      mutate(std.error = ifelse(
+        !is.na(std.error), paste0('(', std.error, ')'), NA)
+      )
+  }
+  reg_table <- select(reg_table, -matches('p\\.value'))
+
+  reg_table_bottom <- gather(
+    reg_table, type2, estimate, -label, -flevels, -level_order, -type
+  ) %>%
+    left_join(label_tibble, by = 'label') %>%
+    arrange(order, level_order, type2) %>%
+    filter(
+      !(type %in% c('omitted', 'sumstat', 'sumstatN') & type2 == 'std.error')
+    ) %>%
+    mutate(type = case_when(
+      type == 'coef/se' & type2 == 'estimate' ~ 'coef',
+      type == 'coef/se' & type2 == 'std.error' ~ 'se',
+      TRUE ~ type
+    )) %>%
+    select(-order, -type2)
+  browser()
+}
 
 z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
 z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
