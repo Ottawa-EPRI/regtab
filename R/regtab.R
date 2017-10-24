@@ -187,11 +187,16 @@ combine_reg <- function(reg_list) {
         function(r) paste0(r, '.', .y)
       )
   )
-  combined_regs <- reduce(
-    regs,
-    ~ full_join(.x, .y, by = c('label', 'flevels', 'level_order', 'type'))
-  )
-  sumstats <- combined_regs %>% filter(type %in% c('sumstat', 'sumstatN'))
+  if (length(regs) > 1) {
+    combined_regs <- reduce(
+      regs,
+      ~ full_join(.x, .y, by = c('label', 'flevels', 'level_order', 'type'))
+    )
+  } else {
+    combined_regs <- regs
+  }
+  sumstats <- combined_regs %>%
+    filter(type %in% c('sumstat', 'sumstatN'))
   combined_regs %>%
     filter(!type %in% c('sumstat', 'sumstatN')) %>%
     bind_rows(sumstats)
