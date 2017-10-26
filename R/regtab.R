@@ -123,10 +123,10 @@ regtab <- function(
   label_order <- tibble(
     label = unique_labels, label_order = seq_along(unique_labels)
   )
+
   tidy_table <- left_join(tidy_table, label_order, by = 'label') %>%
     arrange(label_order, level_order) %>%
-    select(-label_order, -term) %>%
-    select(label, flevels, level_order, type, everything())
+    select(-label_order, -term)
 
   # Add est.sig stars if desired.
   if (!is.null(pvals)) {
@@ -163,7 +163,8 @@ regtab <- function(
     mutate(
       estimate = ifelse(is.na(est.sig), estimate, paste0(estimate, est.sig))
     ) %>%
-    select(-matches('statistic|is_factor|est\\.sig'))
+    select(-matches('statistic|is_factor|est\\.sig')) %>%
+    select(label, flevels, level_order, type, everything())
 }
 
 reg_format <- function(
