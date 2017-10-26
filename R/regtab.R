@@ -307,9 +307,9 @@ output_latex <- function(
 
   table_pream <- c(
     sprintf(
-      '\\begin{%s}{%s}',
+      '\\begin{%s}{l%s}',
       env,
-      paste0('l', rep('D{.}{.}{6}', total_cols - 1), collapse = '')
+      paste0(rep('D{.}{.}{6}', total_cols - 1), collapse = '')
     ),
     group_names_full,
     if (max(header_rle$lengths) > 1) stat_cols_full else NULL
