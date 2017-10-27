@@ -250,7 +250,11 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
 
 output_latex <- function(
   reg_table,
-  env = 'longtable'
+  group_names = NULL,
+  caption = NULL,
+  env = 'longtable',
+  repeat_heading = TRUE,
+  bottom_rule = TRUE
 ) {
   # What happens if there's not multiple estimates? We don't have tacked on,
   # .a, .b suffixes, but we do require those to do the rest, so we rename
@@ -285,7 +289,11 @@ output_latex <- function(
   model_groupings <- map_chr(stat_cols, ~ substr(.x, nchar(.x), nchar(.x)))
   header_rle <- rle(model_groupings)
   # We need to fix this to take user input if desired.
-  group_names <- map_chr(seq_along(header_rle$lengths), ~ sprintf('(%s)', .x))
+  if (is.null(group_names)) {
+    group_names <- map_chr(seq_along(header_rle$lengths), ~ sprintf('(%s)', .x))
+  } else {
+    group_names <- group_names %>% `[`(1:length(header_rle$lengths))
+  }
   group_names_full <- map2_chr(
     group_names,
     header_rle$lengths,
@@ -311,10 +319,32 @@ output_latex <- function(
       env,
       paste0(rep('D{.}{.}{6}', total_cols - 1), collapse = '')
     ),
+    if (!is.null(caption)) sprintf('\\caption{%s}\\\\', caption),
+    if (!is.null(caption)) sprintf('\\label{%s}', caption),
     group_names_full,
-    if (max(header_rle$lengths) > 1) stat_cols_full else NULL
+    if (max(header_rle$lengths) > 1) stat_cols_full,
+    '\\midrule',
+    if (repeat_heading) {
+      c(
+        '\\endfirsthead',
+        if (!is.null(caption)) {
+          sprintf('\\caption*{%s (Continued)}\\\\', caption)
+        },
+        group_names_full,
+        if (max(header_rle$lengths) > 1) stat_cols_full,
+        '\\midrule',
+        '\\endhead'
+      )
+    },
+    if (bottom_rule) {
+      c(
+        '\\bottomrule',
+        sprintf('\\multicolumn{%s}{r@{}}{continued \\ldots}\\\\', total_cols),
+        '\\endfoot',
+        '\\endlastfoot'
+      )
+    }
   )
-
 
   ltable <- vector('character', total_rows)
   for (i in 1:total_rows) {
@@ -348,6 +378,7 @@ output_latex <- function(
   c(
     table_pream,
     ltable,
+    '\\bottomrule',
     sprintf('\\end{%s}', env)
   )
 }
