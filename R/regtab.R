@@ -1,8 +1,3 @@
-library(purrr)
-library(dplyr)
-library(magrittr)
-library(tibble)
-
 get_core_levels <- function(xlevels) {
    bind_rows(
      tibble(
@@ -386,10 +381,3 @@ output_latex <- function(
     sprintf('\\end{%s}', env)
   )
 }
-
-z <- lm(Sepal.Length ~ factor(Sepal.Width), data = iris)
-z <- lm(Sepal.Length ~ Sepal.Width, data = iris)
-z <- lm(Sepal.Length ~ factor(Sepal.Width) * Species, data = iris)
-z <- lm(Sepal.Length ~ factor(Sepal.Width):Species, data = iris)
-z <- lm(Sepal.Length ~ Sepal.Width:Petal.Width, data = iris)
-z <- lm(Sepal.Length ~ factor(Sepal.Width):Species + Species:Petal.Length + factor(Sepal.Width):Species:Petal.Length, data = iris)
