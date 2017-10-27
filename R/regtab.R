@@ -1,3 +1,11 @@
+#' @importFrom tibble tibble
+#' @importFrom dplyr anti_join arrange bind_rows case_when filter
+#'                   full_join group_by left_join mutate mutate_at mutate_if
+#'                   rename rename_at select semi_join ungroup
+#' @importFrom purrr keep map map_chr map2 map2_df reduce
+#' @importFrom tidyr gather
+#' @importFrom magrittr %>%
+
 get_core_levels <- function(xlevels) {
    bind_rows(
      tibble(
@@ -80,6 +88,7 @@ get_interacted_omitted <- function(inter_table, xlevels) {
   tibble(label = inter_table$label, flevels = lv, level_order = 1)
 }
 
+#' @export
 regtab <- function(
   reg,
   pvals = c(`*` = 0.05, `**` = 0.01, `***` = 0.001),
@@ -185,6 +194,7 @@ reg_format <- function(
   }
 }
 
+#' @export
 reg_combine <- function(reg_list) {
   regs <- map2(
     reg_list, letters[1:length(reg_list)],
@@ -209,6 +219,7 @@ reg_combine <- function(reg_list) {
     bind_rows(sumstats)
 }
 
+#' @export
 reg_bottom_se <- function(reg_table, p.value = FALSE) {
   label_tibble <- tibble(
     label = unique(reg_table$label), order = seq_along(label)
