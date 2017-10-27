@@ -1,7 +1,8 @@
-#' @importFrom tibble tibble
-#' @importFrom dplyr anti_join arrange bind_rows case_when filter
-#'                   full_join group_by left_join mutate mutate_at mutate_if
-#'                   rename rename_at select semi_join ungroup
+#' @importFrom tibble tibble rownames_to_column
+#' @importFrom dplyr anti_join arrange bind_rows case_when distinct everything
+#'                   filter full_join funs group_by if_else left_join
+#'                   mutate mutate_at matches mutate_if rename rename_at
+#'                   select semi_join ungroup vars
 #' @importFrom purrr keep map map_chr map2 map2_df reduce
 #' @importFrom tidyr gather
 #' @importFrom magrittr %>%
