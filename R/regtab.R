@@ -186,7 +186,7 @@ reg_format <- function(
   }
 }
 
-combine_reg <- function(reg_list) {
+reg_combine <- function(reg_list) {
   regs <- map2(
     reg_list, letters[1:length(reg_list)],
     ~ rename_at(
