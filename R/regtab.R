@@ -1,11 +1,26 @@
 #' @importFrom tibble tibble rownames_to_column
-#' @importFrom dplyr anti_join arrange bind_rows case_when distinct everything
-#'                   filter full_join funs group_by if_else left_join
+#' @importFrom dplyr anti_join arrange bind_cols bind_rows case_when distinct
+#'                   everything filter full_join funs group_by if_else left_join
 #'                   mutate mutate_at matches mutate_if rename rename_at
-#'                   select semi_join ungroup vars
+#'                   rename_all rowwise select semi_join ungroup vars
+#' @importFrom tibble rownames_to_column
 #' @importFrom purrr keep map map_chr map2 map2_df reduce
 #' @importFrom tidyr gather
-#' @importFrom magrittr %>%
+#' @importFrom magrittr %>% extract
+
+paste_0 <- function(..., collapse = ' * ') {
+  dots <- list(...)
+  dots <- dots %>% extract(!is.na(.))
+  paste0(dots, collapse = collapse)
+}
+
+any_NA <- function(...) {
+  dots <- list(...)
+  if (all(is.na(dots))) return(NA)
+
+  dots <- dots %>% extract(!is.na(.))
+  any(as.logical(dots))
+}
 
 get_core_levels <- function(xlevels) {
    bind_rows(
@@ -25,49 +40,51 @@ get_core_levels <- function(xlevels) {
 }
 
 get_interacted_levels <- function(term, xlevels) {
-  split_interactions <- term[grep(':', term)] %>%
-    strsplit(':', fixed = TRUE)
-  if (length(split_interactions) == 0) {
-    return(NULL)
-  }
+  core_levels <- get_core_levels(xlevels) %>%
+    select(-level_order)
+  split_interactions <- term[grep(':', term)]
+  if (length(split_interactions) == 0) return(NULL)
 
-  core_levels <- get_core_levels(xlevels)
-  interact_tibble <- map(
-    split_interactions,
-    ~ map(
-      .x,
-      ~ tibble(term = .x) %>%
-          left_join(core_levels, by = 'term') %>%
-          mutate(
-            is_factor = !is.na(flevels),
-            label = ifelse(is.na(label), term, label),
-            flevels = ifelse(is.na(flevels), label, flevels)
-          )
-    )
-  )
+  inter_table <- tibble(term = split_interactions) %>%
+    splitstackshape::cSplit('term', ':', type.convert = FALSE) %>%
+    gather(interaction, term) %>%
+    left_join(core_levels, by = 'term') %>%
+    mutate(
+      is_factor = ifelse(!is.na(term), !is.na(flevels), NA),
+      label = ifelse(is.na(label), term, label),
+      flevels = ifelse(is.na(flevels), label, flevels)
+    ) %>%
+    split(.$interaction) %>%
+    map2(
+      1:length(.),
+      ~ .x %>%
+          select(-interaction) %>%
+          rename_all(paste0, '_', .y)
+    ) %>%
+    bind_cols()
 
-  interact_reduce <- map(
-    interact_tibble,
-    ~ reduce(
-        .x,
-        ~ tibble(
-            term = sprintf('%s:%s', .x$term, .y$term),
-            label = sprintf('%s * %s', .x$label, .y$label),
-            flevels = sprintf('%s * %s', .x$flevels, .y$flevels),
-            level_order = NA_integer_,
-            is_factor = any(.x$is_factor, .y$is_factor)
-          )
-    )
-  )
+  termnames <- names(inter_table) %>% extract(grepl('term', .))
+  labnames <- names(inter_table) %>% extract(grepl('label', .))
+  flevelnames <- names(inter_table) %>% extract(grepl('flevels', .))
+  is_factornames <- names(inter_table) %>% extract(grepl('is_factor', .))
 
-  inter_table <- bind_rows(interact_reduce) %>%
-    filter(is_factor != FALSE) %>%
+  inter_table <- inter_table %>%
+    rowwise() %>%
+      mutate(
+        term = paste_0(!!!map(termnames, as.name), collapse = ':'),
+        label = paste_0(!!!map(labnames, as.name)),
+        flevels = paste_0(!!!map(flevelnames, as.name)),
+        is_factor = any_NA(!!!map(is_factornames, as.name))
+      ) %>%
+    ungroup() %>%
+    select(-matches('_[0-9]')) %>%
+    filter(is_factor) %>%
     select(-is_factor)
 
   if (nrow(inter_table) > 0) {
     inter_table <- inter_table %>%
       group_by(label) %>%
-        mutate(level_order = (1:n() + 1)) %>%
+        mutate(level_order = (1L:n() + 1L)) %>%
       ungroup()
     omitted <- get_interacted_omitted(inter_table, xlevels)
     inter_table <- bind_rows(inter_table, omitted)
@@ -107,6 +124,7 @@ regtab <- function(
   # variables.
   core_levels <- get_core_levels(reg$xlevels)
   interacted_levels <- get_interacted_levels(tidy_reg$term, reg$xlevels)
+
   all_possible_levels <- bind_rows(core_levels, interacted_levels)
   continous_vars <- anti_join(tidy_reg, all_possible_levels, by = 'term') %>%
     select(term) %>%
