@@ -284,7 +284,9 @@ reg_remove_base <- function(reg_table, when = 'binary') {
   } else if (when == 'binary') {
     reg_table %>%
       group_by(label) %>%
-        filter(!(all(!is.na(flevels)) & n() == 2 & type == 'omitted')) %>%
+        filter(
+          !(all(!is.na(flevels)) & max(level_order) == 2 & type == 'omitted')
+        ) %>%
       ungroup()
   }
 }
