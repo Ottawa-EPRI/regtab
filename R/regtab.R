@@ -106,6 +106,25 @@ get_interacted_omitted <- function(inter_table, xlevels) {
   tibble(label = inter_table$label, flevels = lv, level_order = 1)
 }
 
+reg_format <- function(
+  reg_table,
+  digits = 3,
+  exclude_n = TRUE
+) {
+  match_vars <- vars(matches('estimate|std\\.error|p\\.value'))
+
+  na_formatC <- function(x) {
+    ifelse(is.na(x), NA_character_, formatC(x, digits = digits, format = 'f'))
+  }
+
+  if (exclude_n) {
+    mutate_at(reg_table, match_vars,
+              funs(ifelse(type != 'sumstatN', na_formatC(.), .)))
+  } else {
+    mutate_at(reg_table, match_vars, na_formatC)
+  }
+}
+
 #' @export
 regtab <- function(
   reg,
@@ -192,25 +211,6 @@ regtab <- function(
     ) %>%
     select(-matches('statistic|is_factor|est\\.sig')) %>%
     select(label, flevels, level_order, type, everything())
-}
-
-reg_format <- function(
-  reg_table,
-  digits = 3,
-  exclude_n = TRUE
-) {
-  match_vars <- vars(matches('estimate|std\\.error|p\\.value'))
-
-  na_formatC <- function(x) {
-    ifelse(is.na(x), NA_character_, formatC(x, digits = digits, format = 'f'))
-  }
-
-  if (exclude_n) {
-    mutate_at(reg_table, match_vars,
-              funs(ifelse(type != 'sumstatN', na_formatC(.), .)))
-  } else {
-    mutate_at(reg_table, match_vars, na_formatC)
-  }
 }
 
 #' @export
