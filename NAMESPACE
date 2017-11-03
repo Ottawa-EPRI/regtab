@@ -3,6 +3,7 @@
 export(output_latex)
 export(reg_bottom_se)
 export(reg_combine)
+export(reg_remove_base)
 export(regtab)
 importFrom(dplyr,anti_join)
 importFrom(dplyr,arrange)

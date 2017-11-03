@@ -276,3 +276,15 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
     )) %>%
     select(-order, -type2)
 }
+
+#' @export
+reg_remove_base <- function(reg_table, when = 'binary') {
+  if (when == 'always') {
+    filter(reg_table, type != 'omitted')
+  } else if (when == 'binary') {
+    reg_table %>%
+      group_by(label) %>%
+        filter(!(all(!is.na(flevels)) & n() == 2 & type == 'omitted')) %>%
+      ungroup()
+  }
+}
