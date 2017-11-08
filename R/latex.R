@@ -120,7 +120,10 @@ output_latex <- function(
 
     if (type == 'omitted') {
       ltable[i] <- sprintf(
-        '\\multicolumn{%s}{l}{%s}\\\\', total_cols, label_current
+        '\\multicolumn{%s}{l}{%s (%s)}\\\\',
+        total_cols,
+        sanitize(label_current),
+        sanitize(reg_table$flevels[i])
       )
     } else {
       sanitized_row <- sanitize(reg_table_min[i, ])
