@@ -7,6 +7,7 @@
 #' @importFrom purrr keep map map_chr map2 map2_df reduce
 #' @importFrom tidyr gather
 #' @importFrom magrittr %>% extract
+#' @importFrom rlang syms
 
 paste_0 <- function(..., collapse = ' * ') {
   dots <- list(...)
@@ -71,10 +72,10 @@ get_interacted_levels <- function(term, xlevels) {
   inter_table <- inter_table %>%
     rowwise() %>%
       mutate(
-        term = paste_0(!!!map(termnames, as.name), collapse = ':'),
-        label = paste_0(!!!map(labnames, as.name)),
-        flevels = paste_0(!!!map(flevelnames, as.name)),
-        is_factor = any_NA(!!!map(is_factornames, as.name))
+        term = paste_0(!!!syms(termnames), collapse = ':'),
+        label = paste_0(!!!syms(labnames)),
+        flevels = paste_0(!!!syms(flevelnames)),
+        is_factor = any_NA(!!!syms(is_factornames))
       ) %>%
     ungroup() %>%
     select(-matches('_[0-9]')) %>%
