@@ -78,6 +78,7 @@ get_interacted_levels <- function(term, xlevels) {
         is_factor = any_NA(!!!syms(is_factornames))
       ) %>%
     ungroup() %>%
+    unite(flevel_factors, !!!syms(is_factornames)) %>%
     select(-matches('_[0-9]')) %>%
     filter(is_factor) %>%
     select(-is_factor)
@@ -290,4 +291,40 @@ reg_remove_base <- function(reg_table, when = 'binary') {
         ) %>%
       ungroup()
   }
+}
+
+#' @export
+reg_add_labels <- function(reg_table, label_list) {
+  labels <- map(strsplit(reg_table$label, '*', fixed = TRUE), trimws)
+  levels <- map(strsplit(reg_table$flevels, '*', fixed = TRUE), trimws)
+  level_factors <-  map(
+    strsplit(reg_table$flevel_factors, "_", fixed = TRUE), as.logical
+  )
+
+  which2 <- compose(function(x) ifelse(length(x) == 0, NA, x), which)
+  level_factors_loc <- map(level_factors, ~ which2(!.x))
+
+  label_matches <- map(labels, match, names(label_list))
+  label_list_flat <- set_names(unlist(label_list), NULL)
+  labels_changed <- map(label_matches, ~ label_list_flat[.x])
+  labels_new <- map2(labels_changed, labels, ~ ifelse(is.na(.x), .y, .x))
+  levels_new <- pmap(
+    list(level_factors, levels, labels_changed),
+    function(x, y, z) ifelse(x, y, z)
+  )
+
+  levels_rebuild <- map_chr(
+    levels_new,
+    ~ {
+      modify_vector <- keep(.x, negate(is.na))
+      ifelse(length(modify_vector) != 0, paste0(modify_vector, collapse = ' * '), NA)
+    }
+  )
+  labels_rebuild <- map_chr(labels_new, paste0, collapse = ' * ')
+
+  reg_table %>%
+    mutate(
+      label = labels_rebuild,
+      flevels = ifelse(type != 'omitted', levels_rebuild, flevels)
+    )
 }
