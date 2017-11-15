@@ -4,8 +4,8 @@
 #'                   mutate mutate_at matches mutate_if rename rename_at
 #'                   rename_all rowwise select semi_join ungroup vars
 #' @importFrom tibble rownames_to_column
-#' @importFrom purrr compose keep map map_chr map2 map2_df reduce
-#' @importFrom tidyr gather
+#' @importFrom purrr keep map map_chr map2 map2_df reduce
+#' @importFrom tidyr gather unite
 #' @importFrom magrittr %>% extract
 #' @importFrom rlang syms
 
@@ -264,7 +264,8 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
   reg_table <- select(reg_table, -matches('p\\.value'))
 
   gather(
-    reg_table, type2, estimate, -label, -flevels, -level_order, -type
+    reg_table, type2, estimate, -label, -flevels, -level_order, -type,
+    -matches('flevel_factors')
   ) %>%
     left_join(label_tibble, by = 'label') %>%
     arrange(order, level_order, type2) %>%
@@ -296,35 +297,32 @@ reg_remove_base <- function(reg_table, when = 'binary') {
 #' @export
 reg_add_labels <- function(reg_table, label_list) {
   labels <- map(strsplit(reg_table$label, '*', fixed = TRUE), trimws)
-  levels <- map(strsplit(reg_table$flevels, '*', fixed = TRUE), trimws)
-  level_factors <-  map(
-    strsplit(reg_table$flevel_factors, "_", fixed = TRUE), as.logical
-  )
-
-  which2 <- compose(function(x) ifelse(length(x) == 0, NA, x), which)
-  level_factors_loc <- map(level_factors, ~ which2(!.x))
-
   label_matches <- map(labels, match, names(label_list))
   label_list_flat <- set_names(unlist(label_list), NULL)
   labels_changed <- map(label_matches, ~ label_list_flat[.x])
   labels_new <- map2(labels_changed, labels, ~ ifelse(is.na(.x), .y, .x))
+  labels_rebuild <- map_chr(labels_new, paste0, collapse = ' * ')
+  reg_table$label <- labels_rebuild
+
+  if (is.null(reg_table$flevel_factors)) return(reg_table)
+
+  levels <- map(strsplit(reg_table$flevels, '*', fixed = TRUE), trimws)
+  level_factors <-  map(
+    strsplit(reg_table$flevel_factors, "_", fixed = TRUE), as.logical
+  )
   levels_new <- pmap(
-    list(level_factors, levels, labels_changed),
-    function(x, y, z) ifelse(x, y, z)
+    list(level_factors, levels, labels_new), ~ ifelse(..1, ..2, ..3)
   )
 
   levels_rebuild <- map_chr(
     levels_new,
     ~ {
       modify_vector <- keep(.x, negate(is.na))
-      ifelse(length(modify_vector) != 0, paste0(modify_vector, collapse = ' * '), NA)
+      ifelse(
+        length(modify_vector) != 0, paste0(modify_vector, collapse = ' * '), NA
+      )
     }
   )
-  labels_rebuild <- map_chr(labels_new, paste0, collapse = ' * ')
-
-  reg_table %>%
-    mutate(
-      label = labels_rebuild,
-      flevels = ifelse(type != 'omitted', levels_rebuild, flevels)
-    )
+  mutate(reg_table,
+         flevels = ifelse(type != 'omitted', levels_rebuild, flevels))
 }
