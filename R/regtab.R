@@ -4,7 +4,7 @@
 #'                   mutate mutate_at matches mutate_if rename rename_at
 #'                   rename_all rowwise select semi_join ungroup vars
 #' @importFrom tibble rownames_to_column
-#' @importFrom purrr keep map map_chr map2 map2_df reduce
+#' @importFrom purrr compose keep map map_chr map2 map2_df reduce
 #' @importFrom tidyr gather
 #' @importFrom magrittr %>% extract
 #' @importFrom rlang syms
