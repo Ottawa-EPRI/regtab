@@ -2,12 +2,14 @@
 #' @importFrom dplyr anti_join arrange bind_cols bind_rows case_when distinct
 #'                   everything filter full_join funs group_by if_else left_join
 #'                   mutate mutate_at matches mutate_if rename rename_at
-#'                   rename_all rowwise select semi_join ungroup vars
+#'                   rename_all rowwise select semi_join starts_with ungroup
+#'                   vars
 #' @importFrom tibble rownames_to_column
 #' @importFrom purrr keep map map_chr map2 map2_df reduce
-#' @importFrom tidyr gather unite
+#' @importFrom tidyr gather
 #' @importFrom magrittr %>% extract
-#' @importFrom rlang syms
+#' @importFrom rlang sym syms
+#' @importFrom splitstackshape cSplit
 
 paste_0 <- function(..., collapse = ' * ') {
   dots <- list(...)
@@ -47,7 +49,7 @@ get_interacted_levels <- function(term, xlevels) {
   if (length(split_interactions) == 0) return(NULL)
 
   inter_table <- tibble(term = split_interactions) %>%
-    splitstackshape::cSplit('term', ':', type.convert = FALSE) %>%
+    cSplit('term', ':', type.convert = FALSE) %>%
     gather(interaction, term) %>%
     left_join(core_levels, by = 'term') %>%
     mutate(
@@ -78,7 +80,6 @@ get_interacted_levels <- function(term, xlevels) {
         is_factor = any_NA(!!!syms(is_factornames))
       ) %>%
     ungroup() %>%
-    unite(flevel_factors, !!!syms(is_factornames)) %>%
     select(-matches('_[0-9]')) %>%
     filter(is_factor) %>%
     select(-is_factor)
@@ -264,8 +265,7 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
   reg_table <- select(reg_table, -matches('p\\.value'))
 
   gather(
-    reg_table, type2, estimate, -label, -flevels, -level_order, -type,
-    -matches('flevel_factors')
+    reg_table, type2, estimate, -label, -flevels, -level_order, -type
   ) %>%
     left_join(label_tibble, by = 'label') %>%
     arrange(order, level_order, type2) %>%
@@ -295,34 +295,66 @@ reg_remove_base <- function(reg_table, when = 'binary') {
 }
 
 #' @export
-reg_add_labels <- function(reg_table, label_list) {
-  labels <- map(strsplit(reg_table$label, '*', fixed = TRUE), trimws)
-  label_matches <- map(labels, match, names(label_list))
-  label_list_flat <- set_names(unlist(label_list), NULL)
-  labels_changed <- map(label_matches, ~ label_list_flat[.x])
-  labels_new <- map2(labels_changed, labels, ~ ifelse(is.na(.x), .y, .x))
-  labels_rebuild <- map_chr(labels_new, paste0, collapse = ' * ')
-  reg_table$label <- labels_rebuild
+reg_add_labels <- function(reg_table, label_list, fixed = TRUE) {
+  #TODO: Rename omitted vars. Dealing with omitted types separately will do
+  #      the trick.
+  label_list <- unlist(label_list)
 
-  if (is.null(reg_table$flevel_factors)) return(reg_table)
+  labels <- reg_table %>%
+    filter(type != 'omitted') %>%
+    select(label, flevels) %>%
+    mutate(label2 = label, flevels2 = flevels) %>%
+    cSplit('label', sep = '*', type.convert = FALSE) %>%
+    cSplit('flevels', sep = '*', type.convert = FALSE) %>%
+    rename(label = label2, flevels = flevels2) %>%
+    mutate_at(
+      vars(newlab_ = starts_with('label_')),
+      ~ {
+        matches <- label_list[match(.x, names(label_list))] %>%
+          set_names(NULL)
+        ifelse(is.na(matches), .x, matches)
+      }
+    ) %>%
+    group_by(label)
 
-  levels <- map(strsplit(reg_table$flevels, '*', fixed = TRUE), trimws)
-  level_factors <-  map(
-    strsplit(reg_table$flevel_factors, "_", fixed = TRUE), as.logical
-  )
-  levels_new <- pmap(
-    list(level_factors, levels, labels_new), ~ ifelse(..1, ..2, ..3)
-  )
+  label_cols <- names(labels)[grep('label_\\d+$', names(labels), perl = TRUE)]
+  label_nums <- gsub('.*(\\d+)', '\\1', label_cols, perl = TRUE)
 
-  levels_rebuild <- map_chr(
-    levels_new,
-    ~ {
-      modify_vector <- keep(.x, negate(is.na))
-      ifelse(
-        length(modify_vector) != 0, paste0(modify_vector, collapse = ' * '), NA
-      )
-    }
-  )
-  mutate(reg_table,
-         flevels = ifelse(type != 'omitted', levels_rebuild, flevels))
+  for (i in label_nums) {
+    label <- sym(paste0('label_', i))
+    level <- sym(paste0('flevels_', i))
+    new_label <- sym(paste0('newlab_', i))
+    labels <- mutate(
+      labels,
+      !!level := ifelse(all((!!label) == (!!level)), !!new_label, !!level)
+    )
+  }
+
+  labels <- labels %>%
+    ungroup() %>%
+    select(matches('^label$'), matches('newlab_'), matches('flevels')) %>%
+    rename_at(
+      vars(starts_with('newlab_')),
+      ~ gsub('label_', '', .x, fixed = TRUE)
+    )
+
+  label_cols <- names(labels) %>% extract(grepl('newlab_', .))
+  flevels_cols <- names(labels) %>% extract(grepl('flevels_', .))
+
+  labels <- labels %>%
+    rowwise() %>%
+      mutate(
+        label_new = paste_0(!!!syms(label_cols)),
+        flevels_new = paste_0(!!!syms(flevels_cols))
+      ) %>%
+    ungroup() %>%
+    select(label, label_new, flevels, flevels_new) %>%
+    mutate(flevels_new = ifelse(is.na(flevels), flevels, flevels_new))
+
+  left_join(reg_table, labels, by = c('label', 'flevels')) %>%
+    mutate(
+      label = ifelse(!is.na(label_new), label_new, label),
+      flevels = ifelse(!is.na(flevels_new), flevels_new, flevels)
+    ) %>%
+    select(-label_new, -flevels_new)
 }
