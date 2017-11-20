@@ -188,7 +188,7 @@ regtab <- function(
       )
     }
   } else {
-    tidy_table %>% mutate(est.sig = NA_character_)
+    tidy_table <- tidy_table %>% mutate(est.sig = NA_character_)
   }
 
   # Properly reform sumstats.
