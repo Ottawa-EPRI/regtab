@@ -41,15 +41,17 @@ get_core_levels <- function(xlevels) {
 }
 
 get_interacted_levels <- function(term, xlevels) {
-  core_levels <- get_core_levels(xlevels) %>%
-    rename(label = label_1, flevels = flevels_1)
+  core_levels <- get_core_levels(xlevels)
   split_interactions <- term[grep(':', term)]
   if (length(split_interactions) == 0) return(NULL)
 
   inter_table <- tibble(term = split_interactions) %>%
     cSplit('term', ':', type.convert = FALSE) %>%
     gather(interaction, term) %>%
-    left_join(core_levels, by = 'term') %>%
+    left_join(
+      rename(core_levels, label = label_1, flevels = flevels_1),
+      by = 'term'
+    ) %>%
     mutate(label = ifelse(is.na(label), term, label)) %>%
     split(.$interaction) %>%
     map2(
@@ -63,30 +65,52 @@ get_interacted_levels <- function(term, xlevels) {
     mutate(term = split_interactions) %>%
     select(term, everything())
 
-  # FIXME: We need to figure out new interactions...
-  #if (nrow(inter_table) > 0) {
-  #  inter_table <- inter_table %>%
-  #    group_by(label) %>%
-  #      mutate(level_order = (1L:n() + 1L)) %>%
-  #    ungroup()
-  #  omitted <- get_interacted_omitted(inter_table, xlevels)
-  #  inter_table <- bind_rows(inter_table, omitted)
-  #}
+  # Omitted interactions
+  # Note: The split screws up the order, but I do not think it actually matters.
+  omitted_core <- core_levels %>%
+    group_by(label_1) %>%
+    distinct(label_1, .keep_all = TRUE)
+  labels <- names(inter_table)[grep('label_', names(inter_table))]
+  seek_omit <- split(inter_table, group_indices(inter_table, !!!syms(labels)))
+
+  inter_table <- map(
+    seek_omit,
+    ~ {
+      o <- slice(.x, 1)
+      ix <- 1
+      for (l in labels) {
+        match_omit <- match(o[, l], omitted_core$label_1)
+        if (!is.na(match_omit)) {
+          o[[paste0('flevels_', ix)]] <- omitted_core$flevels_1[[match_omit]]
+        } else {
+          o[[paste0('flevels_', ix)]] <- NA
+        }
+        ix <- ix + 1
+      }
+      term <- map_chr(
+        1:length(labels),
+        ~ {
+          label <- paste0('label_', .x)
+          level <- paste0('flevels_', .x)
+          if (is_na(o[1, level])) {
+            o[[label]]
+          } else {
+            paste0(o[[label]], o[[level]])
+          }
+        }
+      ) %>%
+        discard(~ is.na(.x)) %>%
+        paste0(collapse = ':')
+      o$term <- term
+      o$type <- 'omitted'
+
+      if (identical(o$term[1], .x$term[1])) .x else bind_rows(o, .x)
+    }
+  ) %>%
+    bind_rows() %>%
+    mutate(type = ifelse(is.na(type), 'coef/se', type))
+
   inter_table
-}
-
-get_interacted_omitted <- function(inter_table, xlevels) {
-  inter_table <- inter_table %>%
-    distinct(label)
-
-  lv <- map_chr(
-    strsplit(inter_table$label, ' * ', fixed = TRUE),
-    ~ map(.x, ~ xlevels[[.x]][1]) %>%
-        keep(~ !is.null(.x)) %>%
-        paste0(collapse = ' * ')
-  )
-
-  tibble(label = inter_table$label, flevels = lv)
 }
 
 reg_format <- function(
@@ -128,55 +152,6 @@ regtab <- function(
   interacted_levels <- get_interacted_levels(tidy_reg$term, reg$xlevels)
 
   # WIP: This maybe doesn't belong here.
-  omitted_core <- core_levels %>%
-    group_by(label_1) %>%
-    distinct(label_1, .keep_all = TRUE)
-  labels <- names(interacted_levels)[grep('label_', names(interacted_levels))]
-  seek_omit <- interacted_levels %>%
-    split(group_indices(., !!!syms(labels)))
-
-  seek2 <- map(
-    seek_omit,
-    ~ {
-      o <- slice(.x, 1)
-      ix <- 1
-      for (l in labels) {
-        match_omit <- match(o[, l], omitted_core$label_1)
-        if (!is.na(match_omit)) {
-          o[[paste0('flevels_', ix)]] <- omitted_core$flevels_1[[match_omit]]
-        } else {
-          o[[paste0('flevels_', ix)]] <- NA
-        }
-        ix <- ix + 1
-      }
-      term <- map_chr(
-        1:length(labels),
-        ~ {
-          label <- paste0('label_', .x)
-          level <- paste0('flevels_', .x)
-          if (is_na(o[1, level])) {
-            o[[label]]
-          } else {
-            paste0(o[[label]], o[[level]])
-          }
-        }
-      ) %>%
-        discard(~ is.na(.x)) %>%
-        paste0(collapse = ':')
-
-      o$term <- term
-      o$type <- 'omitted'
-      if (identical(o$term[1], .x$term[1])) {
-        .x
-      } else {
-        bind_rows(o, .x)
-      }
-    }
-  )
-
-  seek3 <- bind_rows(seek2) %>%
-    mutate(type = ifelse(is.na(type), 'coef/se', type))
-  browser()
 
   all_possible_levels <- bind_rows(core_levels, interacted_levels)
 
