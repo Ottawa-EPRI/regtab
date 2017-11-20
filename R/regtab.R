@@ -29,14 +29,12 @@ get_core_levels <- function(xlevels) {
    bind_rows(
      tibble(
        term = character(),
-       label = character(),
-       flevels = character(),
-       level_order = integer()
+       label_1 = character(),
+       flevels_1 = character()
      ),
      map2_df(
        names(xlevels), xlevels,
-       ~ tibble(term = paste0(.x, .y), label = .x, flevels = .y) %>%
-           mutate(level_order = 1:n()) %>%
+       ~ tibble(term = paste0(.x, .y), label_1 = .x, flevels_1 = .y) %>%
            mutate_if(is.factor, as.character)
      )
    )
@@ -44,7 +42,7 @@ get_core_levels <- function(xlevels) {
 
 get_interacted_levels <- function(term, xlevels) {
   core_levels <- get_core_levels(xlevels) %>%
-    select(-level_order)
+    rename(label = label_1, flevels = flevels_1)
   split_interactions <- term[grep(':', term)]
   if (length(split_interactions) == 0) return(NULL)
 
@@ -52,11 +50,7 @@ get_interacted_levels <- function(term, xlevels) {
     cSplit('term', ':', type.convert = FALSE) %>%
     gather(interaction, term) %>%
     left_join(core_levels, by = 'term') %>%
-    mutate(
-      is_factor = ifelse(!is.na(term), !is.na(flevels), NA),
-      label = ifelse(is.na(label), term, label),
-      flevels = ifelse(is.na(flevels), label, flevels)
-    ) %>%
+    mutate(label = ifelse(is.na(label), term, label)) %>%
     split(.$interaction) %>%
     map2(
       1:length(.),
@@ -64,34 +58,20 @@ get_interacted_levels <- function(term, xlevels) {
           select(-interaction) %>%
           rename_all(paste0, '_', .y)
     ) %>%
-    bind_cols()
+    bind_cols() %>%
+    select(starts_with('label'), starts_with('flevels')) %>%
+    mutate(term = split_interactions) %>%
+    select(term, everything())
 
-  termnames <- names(inter_table) %>% extract(grepl('term', .))
-  labnames <- names(inter_table) %>% extract(grepl('label', .))
-  flevelnames <- names(inter_table) %>% extract(grepl('flevels', .))
-  is_factornames <- names(inter_table) %>% extract(grepl('is_factor', .))
-
-  inter_table <- inter_table %>%
-    rowwise() %>%
-      mutate(
-        term = paste_0(!!!syms(termnames), collapse = ':'),
-        label = paste_0(!!!syms(labnames)),
-        flevels = paste_0(!!!syms(flevelnames)),
-        is_factor = any_NA(!!!syms(is_factornames))
-      ) %>%
-    ungroup() %>%
-    select(-matches('_[0-9]')) %>%
-    filter(is_factor) %>%
-    select(-is_factor)
-
-  if (nrow(inter_table) > 0) {
-    inter_table <- inter_table %>%
-      group_by(label) %>%
-        mutate(level_order = (1L:n() + 1L)) %>%
-      ungroup()
-    omitted <- get_interacted_omitted(inter_table, xlevels)
-    inter_table <- bind_rows(inter_table, omitted)
-  }
+  # FIXME: We need to figure out new interactions...
+  #if (nrow(inter_table) > 0) {
+  #  inter_table <- inter_table %>%
+  #    group_by(label) %>%
+  #      mutate(level_order = (1L:n() + 1L)) %>%
+  #    ungroup()
+  #  omitted <- get_interacted_omitted(inter_table, xlevels)
+  #  inter_table <- bind_rows(inter_table, omitted)
+  #}
   inter_table
 }
 
@@ -106,7 +86,7 @@ get_interacted_omitted <- function(inter_table, xlevels) {
         paste0(collapse = ' * ')
   )
 
-  tibble(label = inter_table$label, flevels = lv, level_order = 1)
+  tibble(label = inter_table$label, flevels = lv)
 }
 
 reg_format <- function(
@@ -147,36 +127,78 @@ regtab <- function(
   core_levels <- get_core_levels(reg$xlevels)
   interacted_levels <- get_interacted_levels(tidy_reg$term, reg$xlevels)
 
+  # WIP: This maybe doesn't belong here.
+  omitted_core <- core_levels %>%
+    group_by(label_1) %>%
+    distinct(label_1, .keep_all = TRUE)
+  labels <- names(interacted_levels)[grep('label_', names(interacted_levels))]
+  seek_omit <- interacted_levels %>%
+    split(group_indices(., !!!syms(labels)))
+
+  seek2 <- map(
+    seek_omit,
+    ~ {
+      o <- slice(.x, 1)
+      ix <- 1
+      for (l in labels) {
+        match_omit <- match(o[, l], omitted_core$label_1)
+        if (!is.na(match_omit)) {
+          o[[paste0('flevels_', ix)]] <- omitted_core$flevels_1[[match_omit]]
+        } else {
+          o[[paste0('flevels_', ix)]] <- NA
+        }
+        ix <- ix + 1
+      }
+      term <- map_chr(
+        1:length(labels),
+        ~ {
+          label <- paste0('label_', .x)
+          level <- paste0('flevels_', .x)
+          if (is_na(o[1, level])) {
+            o[[label]]
+          } else {
+            paste0(o[[label]], o[[level]])
+          }
+        }
+      ) %>%
+        discard(~ is.na(.x)) %>%
+        paste0(collapse = ':')
+
+      o$term <- term
+      o$type <- 'omitted'
+      if (identical(o$term[1], .x$term[1])) {
+        .x
+      } else {
+        bind_rows(o, .x)
+      }
+    }
+  )
+
+  seek3 <- bind_rows(seek2) %>%
+    mutate(type = ifelse(is.na(type), 'coef/se', type))
+  browser()
+
   all_possible_levels <- bind_rows(core_levels, interacted_levels)
+
   continous_vars <- anti_join(tidy_reg, all_possible_levels, by = 'term') %>%
     select(term) %>%
-    mutate(label = term)
+    mutate(label_1 = term)
   all_possible_vars <- bind_rows(all_possible_levels, continous_vars)
-  all_possible_omitted_vars <- all_possible_vars %>%
-    filter(level_order == 1)
 
-  # Join the tidy_reg to all possible vars, thereby getting proper labels and
-  # level orders. We need to separately look for which omitted terms need to
-  # come along, and then bind those together.
-  tidy_reg <- tidy_reg %>%
-    left_join(all_possible_vars, by = 'term')
-  omitted_vars <- semi_join(all_possible_omitted_vars, tidy_reg, by = 'label')
-  tidy_table <- bind_rows(tidy_reg, omitted_vars)
+#  # Join the tidy_reg to all possible vars, thereby getting proper labels and
+#  # level orders. We need to separately look for which omitted terms need to
+#  # come along, and then bind those together.
+#  tidy_reg <- tidy_reg %>%
+#    left_join(all_possible_vars, by = 'term')
+#  #omitted_vars <- semi_join(all_possible_omitted_vars, tidy_reg, by = 'label')
+#  #tidy_table <- bind_rows(tidy_reg, omitted_vars)
+#  tidy_table <- tidy_reg
 
   # Since any of the the omitted labels will come at the bottom, we need to
   # have a separate table with the proper label order (i.e., the original
   # tidy_reg label order), and then use the unique order to order the labels,
   # using level order as a second categorization, thus properly ordering the
   # omitted vars (if any). Then we can clean up the column order.
-  unique_labels <- unique(tidy_table$label)
-  label_order <- tibble(
-    label = unique_labels, label_order = seq_along(unique_labels)
-  )
-
-  tidy_table <- left_join(tidy_table, label_order, by = 'label') %>%
-    arrange(label_order, level_order) %>%
-    select(-label_order, -term)
-
   # Add est.sig stars if desired.
   if (!is.null(pvals)) {
     sorted_p <- sort(pvals, decreasing = TRUE)
@@ -193,27 +215,27 @@ regtab <- function(
 
   # Properly reform sumstats.
   sumstats <- rownames_to_column(as.data.frame(sumstats)) %>%
-    rename(label = rowname, estimate = V1)
+    rename(label_1 = rowname, estimate = V1)
 
   # Return stacked tidy_table and sumstats. We will format the digits here
   # because this seems the most logical place to do it and only _then_ add the
   # sig stars (if desired), because we can't do it before we format.
   bind_rows(
-    tidy_table %>%
-      mutate(
-        type = ifelse(
-          level_order == 1 & !is.na(level_order), 'omitted', 'coef/se'
-        )
-      ),
+    tidy_table,
     sumstats %>%
-      mutate(type = ifelse(label == 'N', 'sumstatN', 'sumstat'))
+      mutate(type = ifelse(label_1 == 'N', 'sumstatN', 'sumstat'))
   ) %>%
     reg_format(digits = digits, exclude_n = exclude_n) %>%
     mutate(
       estimate = ifelse(is.na(est.sig), estimate, paste0(estimate, est.sig))
     ) %>%
     select(-matches('statistic|is_factor|est\\.sig')) %>%
-    select(label, flevels, level_order, type, everything())
+    select(
+      starts_with('label_'),
+      starts_with('flevels_'),
+      type,
+      everything()
+    )
 }
 
 #' @export
