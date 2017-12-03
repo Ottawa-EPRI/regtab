@@ -11,20 +11,6 @@
 #' @importFrom rlang sym syms
 #' @importFrom splitstackshape cSplit expandRows
 
-paste_0 <- function(..., collapse = ' * ') {
-  dots <- list(...)
-  dots <- dots %>% extract(!is.na(.))
-  paste0(dots, collapse = collapse)
-}
-
-any_NA <- function(...) {
-  dots <- list(...)
-  if (all(is.na(dots))) return(NA)
-
-  dots <- dots %>% extract(!is.na(.))
-  any(as.logical(dots))
-}
-
 get_core_levels <- function(xlevels) {
   if (length(xlevels) == 0) return(NULL)
 
