@@ -307,12 +307,16 @@ reg_remove_base <- function(reg_table, when = 'binary') {
   if (when == 'always') {
     filter(reg_table, type != 'omitted')
   } else if (when == 'binary') {
+    labels <- names(reg_table)[grepl('label_', names(reg_table), fixed = TRUE)]
     reg_table %>%
-      group_by(label) %>%
-        filter(
-          !(all(!is.na(flevels)) & max(level_order) == 2 & type == 'omitted')
+      group_by(!!!syms(labels)) %>%
+        mutate(
+          bottom = any(type == 'se'),
+          count = (n() - 1) / ifelse(bottom, 2, 1)
         ) %>%
-      ungroup()
+        filter(!(type == 'omitted' & count == 1)) %>%
+      ungroup() %>%
+      select(-bottom, -count)
   }
 }
 
