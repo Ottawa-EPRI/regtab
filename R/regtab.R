@@ -3,9 +3,9 @@
 #'                   everything filter full_join funs group_by if_else left_join
 #'                   mutate mutate_at matches mutate_if rename rename_at
 #'                   rename_all rowwise select semi_join starts_with ungroup
-#'                   vars
+#'                   vars group_indices slice right_join
 #' @importFrom tibble rownames_to_column
-#' @importFrom purrr keep map map_chr map2 map2_df reduce
+#' @importFrom purrr keep map map_chr map2 map2_df reduce discard
 #' @importFrom tidyr gather
 #' @importFrom magrittr %>% extract
 #' @importFrom rlang sym syms
@@ -96,7 +96,7 @@ get_interacted_levels <- function(term, xlevels) {
         ~ {
           label <- paste0('label_', .x)
           level <- paste0('flevels_', .x)
-          if (is_na(o[1, level])) {
+          if (is.na(o[1, level])) {
             o[[label]]
           } else {
             paste0(o[[label]], o[[level]])
