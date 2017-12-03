@@ -9,7 +9,7 @@
 #' @importFrom tidyr gather
 #' @importFrom magrittr %>% extract
 #' @importFrom rlang sym syms
-#' @importFrom splitstackshape cSplit
+#' @importFrom splitstackshape cSplit expandRows
 
 paste_0 <- function(..., collapse = ' * ') {
   dots <- list(...)
@@ -256,10 +256,6 @@ reg_combine <- function(reg_list) {
 
 #' @export
 reg_bottom_se <- function(reg_table, p.value = FALSE) {
-  label_tibble <- tibble(
-    label = unique(reg_table$label), order = seq_along(label)
-  )
-
   if (p.value) {
     reg_table <- reg_table %>%
       mutate(
@@ -275,22 +271,35 @@ reg_bottom_se <- function(reg_table, p.value = FALSE) {
         !is.na(std.error), paste0('(', std.error, ')'), NA)
       )
   }
-  reg_table <- select(reg_table, -matches('p\\.value'))
+  reg_table <- select(reg_table, -matches('p\\.value')) %>%
+    mutate(count = ifelse(type == 'coef/se', 2, 1)) %>%
+    expandRows('count')
 
-  gather(
-    reg_table, type2, estimate, -label, -flevels, -level_order, -type
-  ) %>%
-    left_join(label_tibble, by = 'label') %>%
-    arrange(order, level_order, type2) %>%
-    filter(
-      !(type %in% c('omitted', 'sumstat', 'sumstatN') & type2 == 'std.error')
+  local({
+    t <- vector(mode = 'character', nrow(reg_table))
+    i <- 1
+    while (TRUE) {
+      if (reg_table$type[i] == 'coef/se') {
+        t[i] <- 'coef'
+        t[i + 1] <- 'se'
+        i <- i + 2
+      } else {
+        t[i] <- reg_table$type[i]
+        i <- i + 1
+      }
+      if (i > nrow(reg_table)) break
+    }
+
+    reg_table$type <<- t
+  })
+
+  reg_table %>%
+    mutate(
+      estimate = case_when(
+        type == 'coef' ~ estimate, type == 'se' ~ std.error, TRUE ~ estimate
+      )
     ) %>%
-    mutate(type = case_when(
-      type == 'coef/se' & type2 == 'estimate' ~ 'coef',
-      type == 'coef/se' & type2 == 'std.error' ~ 'se',
-      TRUE ~ type
-    )) %>%
-    select(-order, -type2)
+    select(-std.error)
 }
 
 #' @export
@@ -306,3 +315,4 @@ reg_remove_base <- function(reg_table, when = 'binary') {
       ungroup()
   }
 }
+
