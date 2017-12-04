@@ -23,23 +23,9 @@ output_latex <- function(
     ~ paste0(.x, '.a')
   )
 
-  # We need to 'simplify' the labels appropriately.
-  reg_table_min <- mutate(
-    reg_table,
-    label = case_when(
-      !is.na(label) & !is.na(flevels) & type %in% c('coef', 'coef/se') ~
-        flevels,
-      !is.na(label) & !is.na(flevels) & type == 'omitted' ~
-        sprintf('%s (%s)', label, flevels),
-      !is.na(label) & type == 'se' ~ '',
-      TRUE ~ label
-    )
-  ) %>%
-    select(-matches('flevels|level_order|type')) %>%
-    mutate_all(~ ifelse(is.na(.x), '', .x))
-
-  total_rows <- nrow(reg_table_min)
-  total_cols <- ncol(reg_table_min)
+  total_rows <- nrow(reg_table)
+  non_title_cols <- !grepl('(label|flevels|type)', names(reg_table))
+  total_cols <- sum(non_title_cols) + 1
 
   stat_cols <- names(reg_table) %>% extract(grepl('\\.[a-z]$', .))
   model_groupings <- map_chr(stat_cols, ~ substr(.x, nchar(.x), nchar(.x)))
@@ -103,10 +89,32 @@ output_latex <- function(
   )
 
   ltable <- vector('character', total_rows)
+  labels <- names(reg_table)[grepl('label_', names(reg_table))]
+  flevels <- names(reg_table)[grepl('flevels_', names(reg_table))]
   for (i in 1:total_rows) {
-    label_current <- reg_table$label[i]
-    label_next <- reg_table$label[i + 1]
+    label_current <- unlist(reg_table[i, labels], use.names = FALSE)
+    label_current <- if (all(is.na(label_current))) {
+      NA
+    } else {
+      discard(label_current, is.na) %>%
+        paste(collapse = ' * ')
+    }
+
+    label_next <- unlist(reg_table[i + 1, labels], use.names = FALSE)
+    label_next <- if (all(is.na(label_next))) {
+      NA
+    } else {
+      discard(label_next, is.na) %>%
+        paste(collapse = ' * ')
+    }
     type <- reg_table$type[i]
+    flevel <- unlist(reg_table[i, flevels], use.names = FALSE)
+    flevel <- if (all(is.na(flevel))) {
+      NA
+    } else {
+      discard(flevel, is.na) %>%
+        paste(collapse = ' * ')
+    }
 
     if (
       !is.na(label_next) &
@@ -123,10 +131,14 @@ output_latex <- function(
         '\\multicolumn{%s}{l}{%s (%s)}\\\\',
         total_cols,
         sanitize(label_current),
-        sanitize(reg_table$flevels[i])
+        sanitize(flevel)
       )
     } else {
-      sanitized_row <- sanitize(reg_table_min[i, ])
+      row_label <- if (is.na(flevel)) label_current else flevel
+      sanitized_row <- unlist(
+        c(row_label, reg_table[i, non_title_cols]), use.names = FALSE
+      ) %>%
+        map_chr(~ ifelse(is.na(.x), '', .x))
       sanitized_row[2:length(sanitized_row)] <- gsub(
         '(\\*+)', '^{\\1}', sanitized_row[2:length(sanitized_row)]
       )
