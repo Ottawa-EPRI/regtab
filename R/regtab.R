@@ -228,7 +228,18 @@ reg_combine <- function(reg_list) {
   if (length(regs) > 1) {
     combined_regs <- reduce(
       regs,
-      ~ full_join(.x, .y, by = c('label', 'flevels', 'level_order', 'type'))
+      ~ {
+        label_x <- names(.x)[grepl('label_', names(.x))]
+        label_y <- names(.y)[grepl('label_', names(.y))]
+
+        flevels_x <- names(.x)[grepl('flevels_', names(.x))]
+        flevels_y <- names(.y)[grepl('flevels_', names(.y))]
+
+        common_labels <- intersect(label_x, label_y)
+        common_flevels <- intersect(flevels_x, flevels_y)
+
+        full_join(.x, .y, by = c(common_labels, common_flevels, 'type'))
+      }
     )
   } else {
     combined_regs <- regs
