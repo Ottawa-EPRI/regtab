@@ -206,7 +206,7 @@ regtab <- function(
     mutate(
       estimate = ifelse(is.na(est.sig), estimate, paste0(estimate, est.sig))
     ) %>%
-    select(-matches('statistic|is_factor|est\\.sig')) %>%
+    select(-term, -matches('statistic|is_factor|est\\.sig')) %>%
     select(
       starts_with('label_'),
       starts_with('flevels_'),
